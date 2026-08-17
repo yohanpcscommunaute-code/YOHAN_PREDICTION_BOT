@@ -23,12 +23,19 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 def main():
+    if not TOKEN:
+        raise ValueError(
+            "❌ TELEGRAM_TOKEN est introuvable. "
+            "Vérifie le secret TELEGRAM_TOKEN dans GitHub."
+        )
+
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
 
     print("🤖 YOHAN PREDICTION BOT démarré...")
+
     app.run_polling()
 
 
