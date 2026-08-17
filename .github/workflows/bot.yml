@@ -19,6 +19,16 @@ jobs:
       - name: Installer les dépendances
         run: pip install -r requirements.txt
 
+      - name: Vérifier le token
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+        run: |
+          if [ -z "$TELEGRAM_TOKEN" ]; then
+            echo "❌ TELEGRAM_TOKEN est manquant"
+            exit 1
+          fi
+          echo "✅ TELEGRAM_TOKEN est présent"
+
       - name: Lancer le bot
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
