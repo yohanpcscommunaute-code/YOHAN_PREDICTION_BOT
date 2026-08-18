@@ -20,10 +20,7 @@ from database import (
     set_language,
 )
 
-from languages import (
-    TEXTS,
-    LANGUAGE_NAMES,
-)
+from languages import TEXTS
 
 from message_manager import (
     send_clean_message,
@@ -38,7 +35,7 @@ TOKEN = os.getenv("TELEGRAM_TOKEN")
 
 
 # ============================================================
-# OUTILS
+# TEXTES
 # ============================================================
 
 def get_text(user_id, key, **kwargs):
@@ -57,7 +54,7 @@ def get_text(user_id, key, **kwargs):
 
 
 # ============================================================
-# BOUTON LANGUES
+# LANGUES
 # ============================================================
 
 def language_keyboard():
@@ -113,74 +110,99 @@ def language_keyboard():
 
 
 # ============================================================
+# TEXTES DU MENU
+# ============================================================
+
+def menu_labels(language):
+
+    labels = {
+
+        "fr": {
+            "language": "🌐 LANGUE",
+            "support": "🆘 SUPPORT",
+            "how": "ℹ️ COMMENT ÇA MARCHE",
+            "games": "🎮 JEUX",
+            "web": "🌐 MEGA GAMES WEB V9",
+        },
+
+        "en": {
+            "language": "🌐 LANGUAGE",
+            "support": "🆘 SUPPORT",
+            "how": "ℹ️ HOW IT WORKS",
+            "games": "🎮 GAMES",
+            "web": "🌐 MEGA GAMES WEB V9",
+        },
+
+        "es": {
+            "language": "🌐 IDIOMA",
+            "support": "🆘 SOPORTE",
+            "how": "ℹ️ CÓMO FUNCIONA",
+            "games": "🎮 JUEGOS",
+            "web": "🌐 MEGA GAMES WEB V9",
+        },
+
+        "la": {
+            "language": "🌐 LINGUA",
+            "support": "🆘 AUXILIUM",
+            "how": "ℹ️ QUOMODO OPERATUR",
+            "games": "🎮 LUDI",
+            "web": "🌐 MEGA GAMES WEB V9",
+        },
+
+        "ar": {
+            "language": "🌐 اللغة",
+            "support": "🆘 الدعم",
+            "how": "ℹ️ كيف يعمل؟",
+            "games": "🎮 الألعاب",
+            "web": "🌐 MEGA GAMES WEB V9",
+        },
+
+        "pt": {
+            "language": "🌐 IDIOMA",
+            "support": "🆘 SUPORTE",
+            "how": "ℹ️ COMO FUNCIONA",
+            "games": "🎮 JOGOS",
+            "web": "🌐 MEGA GAMES WEB V9",
+        },
+
+        "zh": {
+            "language": "🌐 语言",
+            "support": "🆘 客服",
+            "how": "ℹ️ 使用方法",
+            "games": "🎮 游戏",
+            "web": "🌐 MEGA GAMES WEB V9",
+        },
+
+        "hi": {
+            "language": "🌐 भाषा",
+            "support": "🆘 सपोर्ट",
+            "how": "ℹ️ यह कैसे काम करता है",
+            "games": "🎮 गेम्स",
+            "web": "🌐 MEGA GAMES WEB V9",
+        },
+
+        "ru": {
+            "language": "🌐 ЯЗЫК",
+            "support": "🆘 ПОДДЕРЖКА",
+            "how": "ℹ️ КАК ЭТО РАБОТАЕТ",
+            "games": "🎮 ИГРЫ",
+            "web": "🌐 MEGA GAMES WEB V9",
+        },
+    }
+
+    return labels.get(
+        language,
+        labels["fr"]
+    )
+
+
+# ============================================================
 # MENU PRINCIPAL
 # ============================================================
 
+def main_menu_keyboard(language):
 
-         def main_menu_keyboard(language):
-
-    if language == "fr":
-        games_text = "🎮 JEUX"
-        language_text = "🌐 LANGUE"
-        support_text = "🆘 SUPPORT"
-        how_text = "ℹ️ COMMENT ÇA MARCHE"
-        web_text = "🌐 MEGA GAMES WEB V9"
-
-    elif language == "en":
-        games_text = "🎮 GAMES"
-        language_text = "🌐 LANGUAGE"
-        support_text = "🆘 SUPPORT"
-        how_text = "ℹ️ HOW IT WORKS"
-        web_text = "🌐 MEGA GAMES WEB V9"
-
-    elif language == "es":
-        games_text = "🎮 JUEGOS"
-        language_text = "🌐 IDIOMA"
-        support_text = "🆘 SOPORTE"
-        how_text = "ℹ️ CÓMO FUNCIONA"
-        web_text = "🌐 MEGA GAMES WEB V9"
-
-    elif language == "ar":
-        games_text = "🎮 الألعاب"
-        language_text = "🌐 اللغة"
-        support_text = "🆘 الدعم"
-        how_text = "ℹ️ كيف يعمل؟"
-        web_text = "🌐 MEGA GAMES WEB V9"
-
-    elif language == "pt":
-        games_text = "🎮 JOGOS"
-        language_text = "🌐 IDIOMA"
-        support_text = "🆘 SUPORTE"
-        how_text = "ℹ️ COMO FUNCIONA"
-        web_text = "🌐 MEGA GAMES WEB V9"
-
-    elif language == "zh":
-        games_text = "🎮 游戏"
-        language_text = "🌐 语言"
-        support_text = "🆘 客服"
-        how_text = "ℹ️ 使用方法"
-        web_text = "🌐 MEGA GAMES WEB V9"
-
-    elif language == "hi":
-        games_text = "🎮 गेम्स"
-        language_text = "🌐 भाषा"
-        support_text = "🆘 सपोर्ट"
-        how_text = "ℹ️ यह कैसे काम करता है"
-        web_text = "🌐 MEGA GAMES WEB V9"
-
-    elif language == "ru":
-        games_text = "🎮 ИГРЫ"
-        language_text = "🌐 ЯЗЫК"
-        support_text = "🆘 ПОДДЕРЖКА"
-        how_text = "ℹ️ КАК ЭТО РАБОТАЕТ"
-        web_text = "🌐 MEGA GAMES WEB V9"
-
-    else:
-        games_text = "🎮 JEUX"
-        language_text = "🌐 LANGUE"
-        support_text = "🆘 SUPPORT"
-        how_text = "ℹ️ COMMENT ÇA MARCHE"
-        web_text = "🌐 MEGA GAMES WEB V9"
+    labels = menu_labels(language)
 
     return InlineKeyboardMarkup([
 
@@ -199,7 +221,7 @@ def language_keyboard():
         # WEB APP
         [
             InlineKeyboardButton(
-                web_text,
+                labels["web"],
                 callback_data="mega_games"
             )
         ],
@@ -207,7 +229,7 @@ def language_keyboard():
         # JEUX
         [
             InlineKeyboardButton(
-                games_text,
+                labels["games"],
                 callback_data="games"
             )
         ],
@@ -215,7 +237,7 @@ def language_keyboard():
         # LANGUE
         [
             InlineKeyboardButton(
-                language_text,
+                labels["language"],
                 callback_data="language"
             )
         ],
@@ -223,7 +245,7 @@ def language_keyboard():
         # SUPPORT
         [
             InlineKeyboardButton(
-                support_text,
+                labels["support"],
                 callback_data="support"
             )
         ],
@@ -231,31 +253,45 @@ def language_keyboard():
         # COMMENT ÇA MARCHE
         [
             InlineKeyboardButton(
-                how_text,
+                labels["how"],
                 callback_data="how"
             )
         ],
     ])
-        
 
 
 # ============================================================
-# MENU DES JEUX
+# MENU JEUX
 # ============================================================
 
 def games_keyboard(language):
 
     if language == "fr":
-        back_text = "↩️ RETOUR"
+        back = "↩️ RETOUR"
 
     elif language == "en":
-        back_text = "↩️ BACK"
+        back = "↩️ BACK"
 
     elif language == "es":
-        back_text = "↩️ VOLVER"
+        back = "↩️ VOLVER"
+
+    elif language == "pt":
+        back = "↩️ VOLTAR"
+
+    elif language == "ar":
+        back = "↩️ رجوع"
+
+    elif language == "zh":
+        back = "↩️ 返回"
+
+    elif language == "hi":
+        back = "↩️ वापस"
+
+    elif language == "ru":
+        back = "↩️ НАЗАД"
 
     else:
-        back_text = "↩️ BACK"
+        back = "↩️ REDIRE"
 
     return InlineKeyboardMarkup([
         [
@@ -270,7 +306,7 @@ def games_keyboard(language):
         ],
         [
             InlineKeyboardButton(
-                back_text,
+                back,
                 callback_data="menu"
             )
         ],
@@ -278,7 +314,7 @@ def games_keyboard(language):
 
 
 # ============================================================
-# /START
+# START
 # ============================================================
 
 async def start(
@@ -290,15 +326,10 @@ async def start(
 
     register_user(user)
 
-    text = get_text(
-        user.id,
-        "welcome"
-    )
-
     await send_clean_message(
         context,
         update.effective_chat.id,
-        text,
+        get_text(user.id, "welcome"),
         parse_mode="HTML",
         reply_markup=language_keyboard(),
     )
@@ -361,12 +392,10 @@ async def menu_callback(
 
     language = get_language(user_id)
 
-    text = TEXTS[language]["main_menu"]
-
     await send_clean_message(
         context,
         query.message.chat_id,
-        text,
+        TEXTS[language]["main_menu"],
         parse_mode="HTML",
         reply_markup=main_menu_keyboard(language),
     )
@@ -389,12 +418,10 @@ async def games_callback(
 
     language = get_language(user_id)
 
-    text = TEXTS[language]["games"]
-
     await send_clean_message(
         context,
         query.message.chat_id,
-        text,
+        TEXTS[language]["games"],
         parse_mode="HTML",
         reply_markup=games_keyboard(language),
     )
@@ -417,8 +444,6 @@ async def crash_callback(
 
     language = get_language(user_id)
 
-    text = TEXTS[language]["crash"]
-
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton(
@@ -437,7 +462,7 @@ async def crash_callback(
     await send_clean_message(
         context,
         query.message.chat_id,
-        text,
+        TEXTS[language]["crash"],
         parse_mode="HTML",
         reply_markup=keyboard,
     )
@@ -460,8 +485,6 @@ async def aviator_callback(
 
     language = get_language(user_id)
 
-    text = TEXTS[language]["aviator"]
-
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton(
@@ -480,7 +503,9 @@ async def aviator_callback(
     await send_clean_message(
         context,
         query.message.chat_id,
-        text,
+        TEXTS[language]["crash"]
+        if False
+        else TEXTS[language]["aviator"],
         parse_mode="HTML",
         reply_markup=keyboard,
     )
@@ -579,6 +604,73 @@ async def how_callback(
 
 
 # ============================================================
+# MEGA GAMES WEB V9
+# ============================================================
+
+async def mega_games_callback(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    query = update.callback_query
+
+    await query.answer()
+
+    user_id = query.from_user.id
+
+    language = get_language(user_id)
+
+    messages = {
+        "fr": "🌐 <b>MEGA GAMES WEB V9</b>\n\n"
+              "La Web App sera disponible prochainement.",
+
+        "en": "🌐 <b>MEGA GAMES WEB V9</b>\n\n"
+              "The Web App will be available soon.",
+
+        "es": "🌐 <b>MEGA GAMES WEB V9</b>\n\n"
+              "La Web App estará disponible próximamente.",
+
+        "la": "🌐 <b>MEGA GAMES WEB V9</b>\n\n"
+              "Applicatio interretialis mox praesto erit.",
+
+        "ar": "🌐 <b>MEGA GAMES WEB V9</b>\n\n"
+              "سيكون تطبيق الويب متاحاً قريباً.",
+
+        "pt": "🌐 <b>MEGA GAMES WEB V9</b>\n\n"
+              "A Web App estará disponível em breve.",
+
+        "zh": "🌐 <b>MEGA GAMES WEB V9</b>\n\n"
+              "Web App 即将推出。",
+
+        "hi": "🌐 <b>MEGA GAMES WEB V9</b>\n\n"
+              "Web App जल्द उपलब्ध होगी।",
+
+        "ru": "🌐 <b>MEGA GAMES WEB V9</b>\n\n"
+              "Web App скоро будет доступно.",
+    }
+
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                TEXTS[language]["menu"],
+                callback_data="menu"
+            )
+        ]
+    ])
+
+    await send_clean_message(
+        context,
+        query.message.chat_id,
+        messages.get(
+            language,
+            messages["fr"]
+        ),
+        parse_mode="HTML",
+        reply_markup=keyboard,
+    )
+
+
+# ============================================================
 # MAIN
 # ============================================================
 
@@ -587,8 +679,8 @@ def main():
     if not TOKEN:
 
         raise ValueError(
-            "TELEGRAM_TOKEN est introuvable. "
-            "Ajoute le secret TELEGRAM_TOKEN."
+            "❌ TELEGRAM_TOKEN est introuvable.\n"
+            "Vérifie le secret TELEGRAM_TOKEN."
         )
 
     init_database()
@@ -599,7 +691,7 @@ def main():
         .build()
     )
 
-    # /start
+    # START
     app.add_handler(
         CommandHandler(
             "start",
@@ -607,7 +699,7 @@ def main():
         )
     )
 
-    # Langues
+    # LANGUES
     app.add_handler(
         CallbackQueryHandler(
             language_callback,
@@ -615,7 +707,7 @@ def main():
         )
     )
 
-    # Menu
+    # MENU
     app.add_handler(
         CallbackQueryHandler(
             menu_callback,
@@ -623,7 +715,7 @@ def main():
         )
     )
 
-    # Jeux
+    # JEUX
     app.add_handler(
         CallbackQueryHandler(
             games_callback,
@@ -631,7 +723,7 @@ def main():
         )
     )
 
-    # Crash
+    # CRASH
     app.add_handler(
         CallbackQueryHandler(
             crash_callback,
@@ -639,7 +731,7 @@ def main():
         )
     )
 
-    # Aviator
+    # AVIATOR
     app.add_handler(
         CallbackQueryHandler(
             aviator_callback,
@@ -647,7 +739,7 @@ def main():
         )
     )
 
-    # Langue
+    # LANGUE
     app.add_handler(
         CallbackQueryHandler(
             language_menu_callback,
@@ -655,7 +747,7 @@ def main():
         )
     )
 
-    # Support
+    # SUPPORT
     app.add_handler(
         CallbackQueryHandler(
             support_callback,
@@ -663,11 +755,19 @@ def main():
         )
     )
 
-    # Comment ça marche
+    # COMMENT ÇA MARCHE
     app.add_handler(
         CallbackQueryHandler(
             how_callback,
             pattern=r"^how$"
+        )
+    )
+
+    # MEGA GAMES
+    app.add_handler(
+        CallbackQueryHandler(
+            mega_games_callback,
+            pattern=r"^mega_games$"
         )
     )
 
