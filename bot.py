@@ -22,10 +22,6 @@ from database import (
 
 from languages import TEXTS
 
-from message_manager import (
-    send_clean_message,
-)
-
 
 # ============================================================
 # CONFIGURATION
@@ -33,80 +29,110 @@ from message_manager import (
 
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 
-
-# ============================================================
-# TEXTES
-# ============================================================
-
-def get_text(user_id, key, **kwargs):
-
-    language = get_language(user_id)
-
-    if language not in TEXTS:
-        language = "fr"
-
-    text = TEXTS[language].get(key, "")
-
-    if kwargs:
-        text = text.format(**kwargs)
-
-    return text
+MENU_IMAGE = (
+    "https://i.ibb.co/0RtRzkQZ/"
+    "IMG-20260808-014512-643.jpg"
+)
 
 
 # ============================================================
-# LANGUES
+# GESTION DES MESSAGES
 # ============================================================
 
-def language_keyboard():
+async def delete_previous_message(
+    context,
+    chat_id
+):
+    """
+    Supprime le dernier message envoyé par le bot
+    à cet utilisateur.
+    """
 
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(
-                "🇫🇷 Français",
-                callback_data="lang_fr"
-            ),
-            InlineKeyboardButton(
-                "🇬🇧 English",
-                callback_data="lang_en"
-            ),
-        ],
-        [
-            InlineKeyboardButton(
-                "🇪🇸 Español",
-                callback_data="lang_es"
-            ),
-            InlineKeyboardButton(
-                "🇻🇦 Latin",
-                callback_data="lang_la"
-            ),
-        ],
-        [
-            InlineKeyboardButton(
-                "🇸🇦 العربية",
-                callback_data="lang_ar"
-            ),
-            InlineKeyboardButton(
-                "🇵🇹 Português",
-                callback_data="lang_pt"
-            ),
-        ],
-        [
-            InlineKeyboardButton(
-                "🇨🇳 中文",
-                callback_data="lang_zh"
-            ),
-            InlineKeyboardButton(
-                "🇮🇳 हिन्दी",
-                callback_data="lang_hi"
-            ),
-        ],
-        [
-            InlineKeyboardButton(
-                "🇷🇺 Русский",
-                callback_data="lang_ru"
-            ),
-        ],
-    ])
+    message_id = context.user_data.get(
+        "last_bot_message_id"
+    )
+
+    if not message_id:
+        return
+
+    try:
+        await context.bot.delete_message(
+            chat_id=chat_id,
+            message_id=message_id
+        )
+    except Exception:
+        pass
+
+    context.user_data.pop(
+        "last_bot_message_id",
+        None
+    )
+
+
+async def send_message_clean(
+    context,
+    chat_id,
+    text,
+    reply_markup=None,
+    parse_mode="HTML"
+):
+    """
+    Supprime l'ancien message du bot,
+    puis envoie un nouveau message.
+    """
+
+    await delete_previous_message(
+        context,
+        chat_id
+    )
+
+    message = await context.bot.send_message(
+        chat_id=chat_id,
+        text=text,
+        parse_mode=parse_mode,
+        reply_markup=reply_markup
+    )
+
+    context.user_data[
+        "last_bot_message_id"
+    ] = message.message_id
+
+    return message
+
+
+async def send_menu(
+    context,
+    chat_id,
+    language
+):
+    """
+    Supprime l'ancien message puis affiche
+    l'image du menu principal avec ses boutons.
+    """
+
+    await delete_previous_message(
+        context,
+        chat_id
+    )
+
+    caption = TEXTS[language].get(
+        "main_menu",
+        "🎮 <b>MENU PRINCIPAL</b>"
+    )
+
+    message = await context.bot.send_photo(
+        chat_id=chat_id,
+        photo=MENU_IMAGE,
+        caption=caption,
+        parse_mode="HTML",
+        reply_markup=main_menu_keyboard(language)
+    )
+
+    context.user_data[
+        "last_bot_message_id"
+    ] = message.message_id
+
+    return message
 
 
 # ============================================================
@@ -206,7 +232,6 @@ def main_menu_keyboard(language):
 
     return InlineKeyboardMarkup([
 
-        # CRASH + AVIATOR
         [
             InlineKeyboardButton(
                 "💥 CRASH",
@@ -218,7 +243,6 @@ def main_menu_keyboard(language):
             ),
         ],
 
-        # WEB APP
         [
             InlineKeyboardButton(
                 labels["web"],
@@ -226,7 +250,6 @@ def main_menu_keyboard(language):
             )
         ],
 
-        # JEUX
         [
             InlineKeyboardButton(
                 labels["games"],
@@ -234,7 +257,6 @@ def main_menu_keyboard(language):
             )
         ],
 
-        # LANGUE
         [
             InlineKeyboardButton(
                 labels["language"],
@@ -242,7 +264,6 @@ def main_menu_keyboard(language):
             )
         ],
 
-        # SUPPORT
         [
             InlineKeyboardButton(
                 labels["support"],
@@ -250,7 +271,6 @@ def main_menu_keyboard(language):
             )
         ],
 
-        # COMMENT ÇA MARCHE
         [
             InlineKeyboardButton(
                 labels["how"],
@@ -261,39 +281,90 @@ def main_menu_keyboard(language):
 
 
 # ============================================================
+# LANGUES
+# ============================================================
+
+def language_keyboard():
+
+    return InlineKeyboardMarkup([
+
+        [
+            InlineKeyboardButton(
+                "🇫🇷 Français",
+                callback_data="lang_fr"
+            ),
+            InlineKeyboardButton(
+                "🇬🇧 English",
+                callback_data="lang_en"
+            ),
+        ],
+
+        [
+            InlineKeyboardButton(
+                "🇪🇸 Español",
+                callback_data="lang_es"
+            ),
+            InlineKeyboardButton(
+                "🇻🇦 Latin",
+                callback_data="lang_la"
+            ),
+        ],
+
+        [
+            InlineKeyboardButton(
+                "🇸🇦 العربية",
+                callback_data="lang_ar"
+            ),
+            InlineKeyboardButton(
+                "🇵🇹 Português",
+                callback_data="lang_pt"
+            ),
+        ],
+
+        [
+            InlineKeyboardButton(
+                "🇨🇳 中文",
+                callback_data="lang_zh"
+            ),
+            InlineKeyboardButton(
+                "🇮🇳 हिन्दी",
+                callback_data="lang_hi"
+            ),
+        ],
+
+        [
+            InlineKeyboardButton(
+                "🇷🇺 Русский",
+                callback_data="lang_ru"
+            ),
+        ],
+    ])
+
+
+# ============================================================
 # MENU JEUX
 # ============================================================
 
 def games_keyboard(language):
 
-    if language == "fr":
-        back = "↩️ RETOUR"
+    back_text = {
 
-    elif language == "en":
-        back = "↩️ BACK"
-
-    elif language == "es":
-        back = "↩️ VOLVER"
-
-    elif language == "pt":
-        back = "↩️ VOLTAR"
-
-    elif language == "ar":
-        back = "↩️ رجوع"
-
-    elif language == "zh":
-        back = "↩️ 返回"
-
-    elif language == "hi":
-        back = "↩️ वापस"
-
-    elif language == "ru":
-        back = "↩️ НАЗАД"
-
-    else:
-        back = "↩️ REDIRE"
+        "fr": "↩️ RETOUR",
+        "en": "↩️ BACK",
+        "es": "↩️ VOLVER",
+        "la": "↩️ REDIRE",
+        "ar": "↩️ رجوع",
+        "pt": "↩️ VOLTAR",
+        "zh": "↩️ 返回",
+        "hi": "↩️ वापस",
+        "ru": "↩️ НАЗАД",
+    }.get(
+        language,
+        "↩️ RETOUR"
+    )
 
     return InlineKeyboardMarkup([
+
         [
             InlineKeyboardButton(
                 "💥 CRASH",
@@ -304,9 +375,10 @@ def games_keyboard(language):
                 callback_data="game_aviator"
             ),
         ],
+
         [
             InlineKeyboardButton(
-                back,
+                back_text,
                 callback_data="menu"
             )
         ],
@@ -326,12 +398,11 @@ async def start(
 
     register_user(user)
 
-    await send_clean_message(
+    await send_message_clean(
         context,
         update.effective_chat.id,
-        get_text(user.id, "welcome"),
-        parse_mode="HTML",
-        reply_markup=language_keyboard(),
+        TEXTS["fr"]["welcome"],
+        reply_markup=language_keyboard()
     )
 
 
@@ -360,18 +431,10 @@ async def language_callback(
         language
     )
 
-    text = (
-        TEXTS[language]["language_selected"]
-        + "\n\n"
-        + TEXTS[language]["main_menu"]
-    )
-
-    await send_clean_message(
+    await send_menu(
         context,
         query.message.chat_id,
-        text,
-        parse_mode="HTML",
-        reply_markup=main_menu_keyboard(language),
+        language
     )
 
 
@@ -390,14 +453,14 @@ async def menu_callback(
 
     user_id = query.from_user.id
 
-    language = get_language(user_id)
+    language = get_language(
+        user_id
+    )
 
-    await send_clean_message(
+    await send_menu(
         context,
         query.message.chat_id,
-        TEXTS[language]["main_menu"],
-        parse_mode="HTML",
-        reply_markup=main_menu_keyboard(language),
+        language
     )
 
 
@@ -416,14 +479,17 @@ async def games_callback(
 
     user_id = query.from_user.id
 
-    language = get_language(user_id)
+    language = get_language(
+        user_id
+    )
 
-    await send_clean_message(
+    await send_message_clean(
         context,
         query.message.chat_id,
         TEXTS[language]["games"],
-        parse_mode="HTML",
-        reply_markup=games_keyboard(language),
+        reply_markup=games_keyboard(
+            language
+        )
     )
 
 
@@ -442,15 +508,19 @@ async def crash_callback(
 
     user_id = query.from_user.id
 
-    language = get_language(user_id)
+    language = get_language(
+        user_id
+    )
 
     keyboard = InlineKeyboardMarkup([
+
         [
             InlineKeyboardButton(
                 TEXTS[language]["generate"],
                 callback_data="generate_crash"
             )
         ],
+
         [
             InlineKeyboardButton(
                 TEXTS[language]["back"],
@@ -459,12 +529,11 @@ async def crash_callback(
         ],
     ])
 
-    await send_clean_message(
+    await send_message_clean(
         context,
         query.message.chat_id,
         TEXTS[language]["crash"],
-        parse_mode="HTML",
-        reply_markup=keyboard,
+        reply_markup=keyboard
     )
 
 
@@ -483,15 +552,19 @@ async def aviator_callback(
 
     user_id = query.from_user.id
 
-    language = get_language(user_id)
+    language = get_language(
+        user_id
+    )
 
     keyboard = InlineKeyboardMarkup([
+
         [
             InlineKeyboardButton(
                 TEXTS[language]["generate"],
                 callback_data="generate_aviator"
             )
         ],
+
         [
             InlineKeyboardButton(
                 TEXTS[language]["back"],
@@ -500,19 +573,16 @@ async def aviator_callback(
         ],
     ])
 
-    await send_clean_message(
+    await send_message_clean(
         context,
         query.message.chat_id,
-        TEXTS[language]["crash"]
-        if False
-        else TEXTS[language]["aviator"],
-        parse_mode="HTML",
-        reply_markup=keyboard,
+        TEXTS[language]["aviator"],
+        reply_markup=keyboard
     )
 
 
 # ============================================================
-# LANGUE
+# CHOIX DE LANGUE
 # ============================================================
 
 async def language_menu_callback(
@@ -524,12 +594,11 @@ async def language_menu_callback(
 
     await query.answer()
 
-    await send_clean_message(
+    await send_message_clean(
         context,
         query.message.chat_id,
         "🌐 <b>LANGUAGE / LANGUE</b>",
-        parse_mode="HTML",
-        reply_markup=language_keyboard(),
+        reply_markup=language_keyboard()
     )
 
 
@@ -548,9 +617,12 @@ async def support_callback(
 
     user_id = query.from_user.id
 
-    language = get_language(user_id)
+    language = get_language(
+        user_id
+    )
 
     keyboard = InlineKeyboardMarkup([
+
         [
             InlineKeyboardButton(
                 TEXTS[language]["menu"],
@@ -559,12 +631,11 @@ async def support_callback(
         ]
     ])
 
-    await send_clean_message(
+    await send_message_clean(
         context,
         query.message.chat_id,
         TEXTS[language]["support"],
-        parse_mode="HTML",
-        reply_markup=keyboard,
+        reply_markup=keyboard
     )
 
 
@@ -583,9 +654,12 @@ async def how_callback(
 
     user_id = query.from_user.id
 
-    language = get_language(user_id)
+    language = get_language(
+        user_id
+    )
 
     keyboard = InlineKeyboardMarkup([
+
         [
             InlineKeyboardButton(
                 TEXTS[language]["menu"],
@@ -594,12 +668,11 @@ async def how_callback(
         ]
     ])
 
-    await send_clean_message(
+    await send_message_clean(
         context,
         query.message.chat_id,
         TEXTS[language]["how"],
-        parse_mode="HTML",
-        reply_markup=keyboard,
+        reply_markup=keyboard
     )
 
 
@@ -618,38 +691,51 @@ async def mega_games_callback(
 
     user_id = query.from_user.id
 
-    language = get_language(user_id)
+    language = get_language(
+        user_id
+    )
 
     messages = {
-        "fr": "🌐 <b>MEGA GAMES WEB V9</b>\n\n"
-              "La Web App sera disponible prochainement.",
 
-        "en": "🌐 <b>MEGA GAMES WEB V9</b>\n\n"
-              "The Web App will be available soon.",
+        "fr":
+        "🌐 <b>MEGA GAMES WEB V9</b>\n\n"
+        "La Web App sera disponible prochainement.",
 
-        "es": "🌐 <b>MEGA GAMES WEB V9</b>\n\n"
-              "La Web App estará disponible próximamente.",
+        "en":
+        "🌐 <b>MEGA GAMES WEB V9</b>\n\n"
+        "The Web App will be available soon.",
 
-        "la": "🌐 <b>MEGA GAMES WEB V9</b>\n\n"
-              "Applicatio interretialis mox praesto erit.",
+        "es":
+        "🌐 <b>MEGA GAMES WEB V9</b>\n\n"
+        "La Web App estará disponible próximamente.",
 
-        "ar": "🌐 <b>MEGA GAMES WEB V9</b>\n\n"
-              "سيكون تطبيق الويب متاحاً قريباً.",
+        "la":
+        "🌐 <b>MEGA GAMES WEB V9</b>\n\n"
+        "Applicatio interretialis mox praesto erit.",
 
-        "pt": "🌐 <b>MEGA GAMES WEB V9</b>\n\n"
-              "A Web App estará disponível em breve.",
+        "ar":
+        "🌐 <b>MEGA GAMES WEB V9</b>\n\n"
+        "سيكون تطبيق الويب متاحاً قريباً.",
 
-        "zh": "🌐 <b>MEGA GAMES WEB V9</b>\n\n"
-              "Web App 即将推出。",
+        "pt":
+        "🌐 <b>MEGA GAMES WEB V9</b>\n\n"
+        "A Web App estará disponível em breve.",
 
-        "hi": "🌐 <b>MEGA GAMES WEB V9</b>\n\n"
-              "Web App जल्द उपलब्ध होगी।",
+        "zh":
+        "🌐 <b>MEGA GAMES WEB V9</b>\n\n"
+        "Web App 即将推出。",
 
-        "ru": "🌐 <b>MEGA GAMES WEB V9</b>\n\n"
-              "Web App скоро будет доступно.",
+        "hi":
+        "🌐 <b>MEGA GAMES WEB V9</b>\n\n"
+        "Web App जल्द उपलब्ध होगी।",
+
+        "ru":
+        "🌐 <b>MEGA GAMES WEB V9</b>\n\n"
+        "Web App скоро будет доступно.",
     }
 
     keyboard = InlineKeyboardMarkup([
+
         [
             InlineKeyboardButton(
                 TEXTS[language]["menu"],
@@ -658,15 +744,14 @@ async def mega_games_callback(
         ]
     ])
 
-    await send_clean_message(
+    await send_message_clean(
         context,
         query.message.chat_id,
         messages.get(
             language,
             messages["fr"]
         ),
-        parse_mode="HTML",
-        reply_markup=keyboard,
+        reply_markup=keyboard
     )
 
 
