@@ -116,55 +116,127 @@ def language_keyboard():
 # MENU PRINCIPAL
 # ============================================================
 
-def main_menu_keyboard(language):
 
-    t = TEXTS[language]
+         def main_menu_keyboard(language):
+
+    if language == "fr":
+        games_text = "🎮 JEUX"
+        language_text = "🌐 LANGUE"
+        support_text = "🆘 SUPPORT"
+        how_text = "ℹ️ COMMENT ÇA MARCHE"
+        web_text = "🌐 MEGA GAMES WEB V9"
+
+    elif language == "en":
+        games_text = "🎮 GAMES"
+        language_text = "🌐 LANGUAGE"
+        support_text = "🆘 SUPPORT"
+        how_text = "ℹ️ HOW IT WORKS"
+        web_text = "🌐 MEGA GAMES WEB V9"
+
+    elif language == "es":
+        games_text = "🎮 JUEGOS"
+        language_text = "🌐 IDIOMA"
+        support_text = "🆘 SOPORTE"
+        how_text = "ℹ️ CÓMO FUNCIONA"
+        web_text = "🌐 MEGA GAMES WEB V9"
+
+    elif language == "ar":
+        games_text = "🎮 الألعاب"
+        language_text = "🌐 اللغة"
+        support_text = "🆘 الدعم"
+        how_text = "ℹ️ كيف يعمل؟"
+        web_text = "🌐 MEGA GAMES WEB V9"
+
+    elif language == "pt":
+        games_text = "🎮 JOGOS"
+        language_text = "🌐 IDIOMA"
+        support_text = "🆘 SUPORTE"
+        how_text = "ℹ️ COMO FUNCIONA"
+        web_text = "🌐 MEGA GAMES WEB V9"
+
+    elif language == "zh":
+        games_text = "🎮 游戏"
+        language_text = "🌐 语言"
+        support_text = "🆘 客服"
+        how_text = "ℹ️ 使用方法"
+        web_text = "🌐 MEGA GAMES WEB V9"
+
+    elif language == "hi":
+        games_text = "🎮 गेम्स"
+        language_text = "🌐 भाषा"
+        support_text = "🆘 सपोर्ट"
+        how_text = "ℹ️ यह कैसे काम करता है"
+        web_text = "🌐 MEGA GAMES WEB V9"
+
+    elif language == "ru":
+        games_text = "🎮 ИГРЫ"
+        language_text = "🌐 ЯЗЫК"
+        support_text = "🆘 ПОДДЕРЖКА"
+        how_text = "ℹ️ КАК ЭТО РАБОТАЕТ"
+        web_text = "🌐 MEGA GAMES WEB V9"
+
+    else:
+        games_text = "🎮 JEUX"
+        language_text = "🌐 LANGUE"
+        support_text = "🆘 SUPPORT"
+        how_text = "ℹ️ COMMENT ÇA MARCHE"
+        web_text = "🌐 MEGA GAMES WEB V9"
 
     return InlineKeyboardMarkup([
+
+        # CRASH + AVIATOR
         [
             InlineKeyboardButton(
-                "🎮 " + (
-                    "JEUX"
-                    if language == "fr"
-                    else "GAMES"
-                    if language == "en"
-                    else "JUEGOS"
-                ),
+                "💥 CRASH",
+                callback_data="game_crash"
+            ),
+            InlineKeyboardButton(
+                "✈️ AVIATOR",
+                callback_data="game_aviator"
+            ),
+        ],
+
+        # WEB APP
+        [
+            InlineKeyboardButton(
+                web_text,
+                callback_data="mega_games"
+            )
+        ],
+
+        # JEUX
+        [
+            InlineKeyboardButton(
+                games_text,
                 callback_data="games"
             )
         ],
+
+        # LANGUE
         [
             InlineKeyboardButton(
-                "🌐 " + (
-                    "LANGUE"
-                    if language == "fr"
-                    else "LANGUAGE"
-                    if language == "en"
-                    else "IDIOMA"
-                ),
+                language_text,
                 callback_data="language"
             )
         ],
+
+        # SUPPORT
         [
             InlineKeyboardButton(
-                "🆘 " + t["support"].split("</b>")[0]
-                .replace("🆘 <b>", ""),
+                support_text,
                 callback_data="support"
             )
         ],
+
+        # COMMENT ÇA MARCHE
         [
             InlineKeyboardButton(
-                "ℹ️ " + (
-                    "COMMENT ÇA MARCHE"
-                    if language == "fr"
-                    else "HOW IT WORKS"
-                    if language == "en"
-                    else "CÓMO FUNCIONA"
-                ),
+                how_text,
                 callback_data="how"
             )
         ],
     ])
+        
 
 
 # ============================================================
