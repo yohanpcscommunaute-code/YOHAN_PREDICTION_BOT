@@ -3,10 +3,10 @@ TEXTS = {
     "fr": {
         "welcome":
             "✨ <b>YOHAN PREDICTION BOT</b> ✨\n\n"
-            "Bienvenue sur notre plateforme de "
-            "prédictions .\n\n"
-            "🎮 Choisis ton jeu et génère une "
-            "prédiction avec un algorithme puissant",
+            "Bienvenue sur notre plateforme.\n\n"
+            "🎮 Choisis ton jeu et lance une prédiction.\n\n"
+            "⚠️ Les résultats ne garantissent pas "
+            "le résultat réel du jeu.",
 
         "games":
             "🎮 <b>JEUX</b>\n\n"
@@ -26,11 +26,12 @@ TEXTS = {
             "1️⃣ Sélectionne un jeu.\n\n"
             "2️⃣ Appuie sur "
             "🔮 <b>GÉNÉRER UNE PRÉDICTION</b>.\n\n"
-            "3️⃣ Le bot génère une simulation avec "
-            "une heure, un ODDS et un SAFE.\n\n"
+            "3️⃣ Une prédiction avec une heure, un "
+            "ODDS et un SAFE sera générée.\n\n"
             "4️⃣ Utilise 🔄 <b>PROCHAIN TOUR</b> "
             "lorsque le délai est terminé.\n\n"
-            "⚠️ Les résultats sont générés à base d'un algorithme puissant.",
+            "⚠️ Les résultats ne garantissent pas "
+            "le résultat réel du jeu.",
 
         "generate":
             "🔮 GÉNÉRER UNE PRÉDICTION",
@@ -47,7 +48,7 @@ TEXTS = {
         "wait":
             "🤖 <b>RÉCUPÉRATION DES DONNÉES "
             "EN COURS...</b>\n\n"
-            "Veuillez réessayer dans pas  "
+            "Veuillez réessayer dans "
             "<b>{minutes} min {seconds} s</b>.",
 
         "prediction":
@@ -60,21 +61,20 @@ TEXTS = {
             "┠ 《◆ SAFE : {safe}X+ ✅\n"
             "┗━━━━━━━━━━━\n\n"
             "🎮 Jeu : <b>{game}</b>\n\n"
-            "⚠️ <i>Simulation à titre démonstratif. "
-            "Ce signal ne garantit aucun résultat "
-            "réel.</i>",
+            "⚠️ <i>Les résultats ne garantissent pas "
+            "le résultat réel du jeu.</i>",
 
         "lucky":
             "✈️ <b>LUCKY JET</b>\n\n"
-            "Système de prédiction simulée.\n\n"
-            "⚠️ Les signaux sont générés "
-            "avec un algorithme puissant.",
+            "Système de prédiction.\n\n"
+            "🔮 Appuie sur le bouton ci-dessous "
+            "pour générer une prédiction.",
 
         "rocket":
             "🚀 <b>ROCKET QUEEN</b>\n\n"
-            "Système de prédiction simulée.\n\n"
-            "⚠️ Les signaux sont générés "
-            "avec un algorithme puissant.",
+            "Système de prédiction.\n\n"
+            "🔮 Appuie sur le bouton ci-dessous "
+            "pour générer une prédiction.",
 
         "language_changed":
             "🇫🇷 Langue française sélectionnée.",
@@ -93,18 +93,13 @@ TEXTS = {
             "🇬🇧 English : {en}",
     },
 
-
     "en": {
         "welcome":
             "✨ <b>YOHAN PREDICTION BOT</b> ✨\n\n"
-            "Welcome to our simulated prediction "
-            "platform.\n\n"
-            "🎮 Choose your game and generate a "
-            "demonstration prediction.\n\n"
-            "⚠️ <b>DISCLAIMER</b>\n"
-            "Results are randomly generated for "
-            "demonstration purposes. They do not "
-            "guarantee the real outcome of a random game.",
+            "Welcome to our platform.\n\n"
+            "🎮 Choose your game and generate a prediction.\n\n"
+            "⚠️ Results do not guarantee the real "
+            "outcome of the game.",
 
         "games":
             "🎮 <b>GAMES</b>\n\n"
@@ -124,12 +119,12 @@ TEXTS = {
             "1️⃣ Select a game.\n\n"
             "2️⃣ Press "
             "🔮 <b>GENERATE PREDICTION</b>.\n\n"
-            "3️⃣ The bot generates a simulation with "
-            "a time, ODDS and SAFE.\n\n"
-            "4️⃣ Use 🔄 <b>NEXT ROUND</b> when "
-            "the cooldown is finished.\n\n"
-            "⚠️ Results are simulated and do not "
-            "guarantee any real outcome.",
+            "3️⃣ A prediction with a time, ODDS and SAFE "
+            "will be generated.\n\n"
+            "4️⃣ Use 🔄 <b>NEXT ROUND</b> when the "
+            "cooldown is finished.\n\n"
+            "⚠️ Results do not guarantee the real "
+            "outcome of the game.",
 
         "generate":
             "🔮 GENERATE PREDICTION",
@@ -149,4 +144,44 @@ TEXTS = {
             "<b>{minutes} min {seconds} sec</b>.",
 
         "prediction":
-            "✨ <b>PREMIUM P
+            "✨ <b>PREMIUM PREDICTIONS</b> ✨\n"
+            "┏━━━━━━━━━━━\n"
+            "┠ 《◆ TIME : {time} ⏰\n"
+            "┠\n"
+            "┠ 《◆ ODDS : {odds}X+ 🚀🚀\n"
+            "┠\n"
+            "┠ 《◆ SAFE : {safe}X+ ✅\n"
+            "┗━━━━━━━━━━━\n\n"
+            "🎮 Game: <b>{game}</b>\n\n"
+            "⚠️ <i>Results do not guarantee the real "
+            "outcome of the game.</i>",
+
+        "lucky":
+            "✈️ <b>LUCKY JET</b>\n\n"
+            "Prediction system.\n\n"
+            "🔮 Press the button below to generate "
+            "a prediction.",
+
+        "rocket":
+            "🚀 <b>ROCKET QUEEN</b>\n\n"
+            "Prediction system.\n\n"
+            "🔮 Press the button below to generate "
+            "a prediction.",
+
+        "language_changed":
+            "🇬🇧 English language selected.",
+
+        "admin_denied":
+            "❌ Administrator access denied.",
+
+        "admin":
+            "👑 <b>ADMIN PANEL</b>\n\n"
+            "👥 Users: {users}\n"
+            "🟢 Active 24h: {active}\n"
+            "🔮 Predictions: {predictions}\n\n"
+            "✈️ LUCKY JET: {lucky}\n"
+            "🚀 ROCKET QUEEN: {rocket}\n\n"
+            "🇫🇷 French: {fr}\n"
+            "🇬🇧 English: {en}",
+    }
+}
