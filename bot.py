@@ -18,6 +18,9 @@ from database import (
     register_user,
     get_language,
     set_language,
+    is_user_fully_verified,
+    is_registration_verified,
+    is_deposit_verified,
 )
 
 from languages import TEXTS
@@ -48,6 +51,7 @@ async def delete_previous_message(
     context,
     chat_id
 ):
+
     message_id = context.user_data.get(
         "last_bot_message_id"
     )
@@ -76,6 +80,7 @@ async def send_message_clean(
     reply_markup=None,
     parse_mode="HTML"
 ):
+
     await delete_previous_message(
         context,
         chat_id
@@ -96,6 +101,86 @@ async def send_message_clean(
 
 
 # ============================================================
+# PROTECTION CENTRALE
+# ============================================================
+
+async def require_full_verification(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    user = update.effective_user
+
+    if is_user_fully_verified(user.id):
+        return True
+
+    language = get_language(user.id)
+
+    registration_ok = is_registration_verified(
+        user.id
+    )
+
+    deposit_ok = is_deposit_verified(
+        user.id
+    )
+
+    if registration_ok and not deposit_ok:
+
+        message = (
+            "💰 <b>DÉPÔT REQUIS</b>\n\n"
+            "Ton inscription est validée, "
+            "mais ton dépôt n'est pas encore validé.\n\n"
+            "Effectue le dépôt demandé puis "
+            "utilise le bouton de vérification."
+        )
+
+    elif not registration_ok and deposit_ok:
+
+        message = (
+            "📝 <b>INSCRIPTION REQUISE</b>\n\n"
+            "Ton dépôt est enregistré, "
+            "mais ton inscription Megapari "
+            "n'est pas encore validée.\n\n"
+            "Effectue ton inscription puis "
+            "utilise le bouton de vérification."
+        )
+
+    else:
+
+        message = megapari_message(
+            language
+        )
+
+    keyboard = megapari_keyboard(
+        language
+    )
+
+    if update.callback_query:
+
+        query = update.callback_query
+
+        await query.answer(
+            "⚠️ Accès non disponible.",
+            show_alert=True
+        )
+
+        chat_id = query.message.chat_id
+
+    else:
+
+        chat_id = update.effective_chat.id
+
+    await send_message_clean(
+        context,
+        chat_id,
+        message,
+        reply_markup=keyboard
+    )
+
+    return False
+
+
+# ============================================================
 # MENU PRINCIPAL
 # ============================================================
 
@@ -104,6 +189,7 @@ async def send_menu(
     chat_id,
     language
 ):
+
     await delete_previous_message(
         context,
         chat_id
@@ -132,6 +218,7 @@ async def send_menu(
 def main_menu_keyboard(language):
 
     labels = {
+
         "fr": {
             "web": "🌐 MEGA GAMES WEB V9",
             "language": "🌐 LANGUE",
@@ -245,7 +332,7 @@ def main_menu_keyboard(language):
 
 
 # ============================================================
-# MENU DES LANGUES
+# LANGUES
 # ============================================================
 
 def language_keyboard():
@@ -316,13 +403,29 @@ async def start(
 
     user = update.effective_user
 
+    # Création/mise à jour du profil Telegram.
+    # Ceci NE valide PAS l'inscription.
     register_user(user)
+
+    if is_user_fully_verified(user.id):
+
+        language = get_language(
+            user.id
+        )
+
+        await send_menu(
+            context,
+            update.effective_chat.id,
+            language
+        )
+
+        return
 
     await send_message_clean(
         context,
         update.effective_chat.id,
-        TEXTS["fr"]["welcome"],
-        reply_markup=language_keyboard()
+        megapari_message("fr"),
+        reply_markup=megapari_keyboard("fr")
     )
 
 
@@ -351,29 +454,17 @@ async def language_callback(
         language
     )
 
-    # Après la langue :
-    # inscription Megapari avant le menu principal.
+    if not await require_full_verification(
+        update,
+        context
+    ):
+        return
 
-    await delete_previous_message(
+    await send_menu(
         context,
-        query.message.chat_id
+        query.message.chat_id,
+        language
     )
-
-    message = await context.bot.send_photo(
-        chat_id=query.message.chat_id,
-        photo=MENU_IMAGE,
-        caption=megapari_message(
-            language
-        ),
-        parse_mode="HTML",
-        reply_markup=megapari_keyboard(
-            language
-        )
-    )
-
-    context.user_data[
-        "last_bot_message_id"
-    ] = message.message_id
 
 
 # ============================================================
@@ -388,6 +479,12 @@ async def menu_callback(
     query = update.callback_query
 
     await query.answer()
+
+    if not await require_full_verification(
+        update,
+        context
+    ):
+        return
 
     user_id = query.from_user.id
 
@@ -415,6 +512,12 @@ async def language_menu_callback(
 
     await query.answer()
 
+    if not await require_full_verification(
+        update,
+        context
+    ):
+        return
+
     await send_message_clean(
         context,
         query.message.chat_id,
@@ -435,6 +538,12 @@ async def games_callback(
     query = update.callback_query
 
     await query.answer()
+
+    if not await require_full_verification(
+        update,
+        context
+    ):
+        return
 
     user_id = query.from_user.id
 
@@ -487,6 +596,12 @@ async def crash_callback(
 
     await query.answer()
 
+    if not await require_full_verification(
+        update,
+        context
+    ):
+        return
+
     user_id = query.from_user.id
 
     language = get_language(
@@ -530,6 +645,12 @@ async def aviator_callback(
     query = update.callback_query
 
     await query.answer()
+
+    if not await require_full_verification(
+        update,
+        context
+    ):
+        return
 
     user_id = query.from_user.id
 
@@ -575,6 +696,12 @@ async def support_callback(
 
     await query.answer()
 
+    if not await require_full_verification(
+        update,
+        context
+    ):
+        return
+
     user_id = query.from_user.id
 
     language = get_language(
@@ -612,6 +739,12 @@ async def how_callback(
 
     await query.answer()
 
+    if not await require_full_verification(
+        update,
+        context
+    ):
+        return
+
     user_id = query.from_user.id
 
     language = get_language(
@@ -648,6 +781,12 @@ async def mega_games_callback(
     query = update.callback_query
 
     await query.answer()
+
+    if not await require_full_verification(
+        update,
+        context
+    ):
+        return
 
     user_id = query.from_user.id
 
@@ -688,7 +827,7 @@ async def mega_games_callback(
 
 
 # ============================================================
-# VERIFICATION MEGAPARI
+# VÉRIFICATION INSCRIPTION
 # ============================================================
 
 async def verify_megapari_callback(
@@ -709,27 +848,19 @@ async def verify_megapari_callback(
     messages = {
 
         "fr":
-        "⏳ <b>VÉRIFICATION</b>\n\n"
-        "La vérification automatique sera activée "
-        "après la connexion complète à l'API Megapari.\n\n"
-        "Merci de patienter.",
+        "🔎 <b>VÉRIFICATION DE L'INSCRIPTION</b>\n\n"
+        "La vérification automatique n'est pas encore "
+        "connectée à l'API Megapari.\n\n"
+        "⚠️ Aucun accès ne sera accordé tant qu'une "
+        "confirmation réelle de l'inscription n'est pas reçue.",
 
         "en":
-        "⏳ <b>VERIFICATION</b>\n\n"
-        "Automatic verification will be enabled "
-        "after the Megapari API integration is completed.\n\n"
-        "Please wait.",
+        "🔎 <b>REGISTRATION VERIFICATION</b>\n\n"
+        "Automatic verification is not yet connected "
+        "to the Megapari API.\n\n"
+        "⚠️ Access will not be granted until a real "
+        "registration confirmation is received.",
     }
-
-    keyboard = InlineKeyboardMarkup([
-
-        [
-            InlineKeyboardButton(
-                TEXTS[language]["menu"],
-                callback_data="menu"
-            )
-        ]
-    ])
 
     await send_message_clean(
         context,
@@ -738,7 +869,54 @@ async def verify_megapari_callback(
             language,
             messages["fr"]
         ),
-        reply_markup=keyboard
+        reply_markup=megapari_keyboard(language)
+    )
+
+
+# ============================================================
+# VÉRIFICATION DÉPÔT
+# ============================================================
+
+async def verify_deposit_callback(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    query = update.callback_query
+
+    await query.answer()
+
+    user_id = query.from_user.id
+
+    language = get_language(
+        user_id
+    )
+
+    messages = {
+
+        "fr":
+        "🔎 <b>VÉRIFICATION DU DÉPÔT</b>\n\n"
+        "La vérification automatique du dépôt n'est pas "
+        "encore connectée au système de paiement.\n\n"
+        "⚠️ Aucun dépôt ne sera marqué comme validé "
+        "sans confirmation réelle.",
+
+        "en":
+        "🔎 <b>DEPOSIT VERIFICATION</b>\n\n"
+        "Automatic deposit verification is not yet "
+        "connected to the payment system.\n\n"
+        "⚠️ No deposit will be marked as verified "
+        "without real confirmation.",
+    }
+
+    await send_message_clean(
+        context,
+        query.message.chat_id,
+        messages.get(
+            language,
+            messages["fr"]
+        ),
+        reply_markup=megapari_keyboard(language)
     )
 
 
@@ -787,7 +965,7 @@ def main():
         )
     )
 
-    # MENU JEUX
+    # JEUX
     app.add_handler(
         CallbackQueryHandler(
             games_callback,
@@ -797,70 +975,4 @@ def main():
 
     # CRASH
     app.add_handler(
-        CallbackQueryHandler(
-            crash_callback,
-            pattern=r"^game_crash$"
-        )
-    )
-
-    # AVIATOR
-    app.add_handler(
-        CallbackQueryHandler(
-            aviator_callback,
-            pattern=r"^game_aviator$"
-        )
-    )
-
-    # LANGUE
-    app.add_handler(
-        CallbackQueryHandler(
-            language_menu_callback,
-            pattern=r"^language$"
-        )
-    )
-
-    # SUPPORT
-    app.add_handler(
-        CallbackQueryHandler(
-            support_callback,
-            pattern=r"^support$"
-        )
-    )
-
-    # COMMENT ÇA MARCHE
-    app.add_handler(
-        CallbackQueryHandler(
-            how_callback,
-            pattern=r"^how$"
-        )
-    )
-
-    # MEGA GAMES
-    app.add_handler(
-        CallbackQueryHandler(
-            mega_games_callback,
-            pattern=r"^mega_games$"
-        )
-    )
-
-    # VERIFICATION MEGAPARI
-    app.add_handler(
-        CallbackQueryHandler(
-            verify_megapari_callback,
-            pattern=r"^verify_megapari$"
-        )
-    )
-
-    print(
-        "🤖 YOHAN PREDICTION BOT démarré..."
-    )
-
-    app.run_polling()
-
-
-# ============================================================
-# LANCEMENT
-# ============================================================
-
-if __name__ == "__main__":
-    main()
+        CallbackQueryH
