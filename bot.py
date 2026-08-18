@@ -2,71 +2,54 @@ import os
 import sqlite3
 from datetime import datetime
 
-from telegram import (
-    Update,
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    ReplyKeyboardMarkup,
-    KeyboardButton,
-)
+from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
-    CallbackQueryHandler,
     ContextTypes,
     filters,
 )
 
-# ============================================================
-# CONFIGURATION
-# ============================================================
-
 TOKEN = os.getenv("TELEGRAM_TOKEN")
-ADMIN_ID = os.getenv("ADMIN_ID")
 
-REFERRAL_BONUS = 50
-MIN_WITHDRAWAL = 2000
+DB = "bot.db"
 
-DB_FILE = "bot.db"
+BONUS_PARRAIN = 50
+MIN_RETRAIT = 2000
 
 
-# ============================================================
+# =========================
 # BASE DE DONNÉES
-# ============================================================
+# =========================
 
-def get_db():
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
-    return conn
+def db():
+    return sqlite3.connect(DB)
 
 
 def init_db():
-    conn = get_db()
+    conn = db()
     cursor = conn.cursor()
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
-            user_id INTEGER PRIMARY KEY,
-            first_name TEXT,
-            last_name TEXT,
+            id INTEGER PRIMARY KEY,
+            name TEXT,
             username TEXT,
             balance INTEGER DEFAULT 0,
-            phone TEXT,
-            referred_by INTEGER,
-            referral_paid INTEGER DEFAULT 0,
-            joined_at TEXT
+            parrain INTEGER,
+            date TEXT
         )
     """)
 
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS withdrawals (
+        CREATE TABLE IF NOT EXISTS retraits (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER,
-            amount INTEGER,
-            phone TEXT,
-            status TEXT DEFAULT 'pending',
-            created_at TEXT
+            montant INTEGER,
+            numero TEXT,
+            date TEXT,
+            statut TEXT
         )
     """)
 
@@ -74,95 +57,82 @@ def init_db():
     conn.close()
 
 
-def get_user(user_id):
-    conn = get_db()
+# =========================
+# UTILISATEUR
+# =========================
 
-    user = conn.execute(
-        "SELECT * FROM users WHERE user_id = ?",
+def get_user(user_id):
+    conn = db()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT * FROM users WHERE id = ?",
         (user_id,)
-    ).fetchone()
+    )
+
+    user = cursor.fetchone()
 
     conn.close()
 
     return user
 
 
-def create_user(user, referred_by=None):
-    conn = get_db()
+def create_user(user, parrain=None):
 
-    existing = conn.execute(
-        "SELECT user_id FROM users WHERE user_id = ?",
-        (user.id,)
-    ).fetchone()
+    if get_user(user.id):
+        return False
 
-    if not existing:
+    conn = db()
+    cursor = conn.cursor()
 
-        conn.execute("""
-            INSERT INTO users (
-                user_id,
-                first_name,
-                last_name,
-                username,
-                balance,
-                referred_by,
-                referral_paid,
-                joined_at
-            )
-            VALUES (?, ?, ?, ?, 0, ?, 0, ?)
-        """, (
-            user.id,
-            user.first_name or "",
-            user.last_name or "",
-            user.username or "",
-            referred_by,
-            datetime.now().strftime(
-                "%Y-%m-%d %H:%M:%S"
-            ),
-        ))
-
-        conn.commit()
-
-    conn.close()
-
-
-def update_user_info(user):
-    conn = get_db()
-
-    conn.execute("""
-        UPDATE users
-        SET first_name = ?,
-            last_name = ?,
-            username = ?
-        WHERE user_id = ?
+    cursor.execute("""
+        INSERT INTO users
+        (id, name, username, balance, parrain, date)
+        VALUES (?, ?, ?, ?, ?, ?)
     """, (
-        user.first_name or "",
-        user.last_name or "",
-        user.username or "",
         user.id,
+        user.first_name,
+        user.username or "",
+        0,
+        parrain,
+        datetime.now().strftime("%d/%m/%Y %H:%M")
     ))
+
+    # Donner 50 F au parrain
+    if parrain and parrain != user.id:
+
+        cursor.execute(
+            "SELECT id FROM users WHERE id = ?",
+            (parrain,)
+        )
+
+        if cursor.fetchone():
+
+            cursor.execute("""
+                UPDATE users
+                SET balance = balance + ?
+                WHERE id = ?
+            """, (
+                BONUS_PARRAIN,
+                parrain
+            ))
 
     conn.commit()
     conn.close()
 
+    return True
 
-# ============================================================
-# MENU PRINCIPAL
-# ============================================================
 
-def main_keyboard():
+# =========================
+# MENU
+# =========================
+
+def menu():
 
     keyboard = [
-        [
-            KeyboardButton("💰 Mon solde"),
-            KeyboardButton("💸 Retrait"),
-        ],
-        [
-            KeyboardButton("👥 Inviter"),
-            KeyboardButton("❓ Aide"),
-        ],
-        [
-            KeyboardButton("👤 Mes parrainés"),
-        ],
+        ["💰 Mon solde", "💸 Retrait"],
+        ["👥 Inviter", "❓ Aide"],
+        ["👤 Mes parrainés"],
     ]
 
     return ReplyKeyboardMarkup(
@@ -171,497 +141,268 @@ def main_keyboard():
     )
 
 
-# ============================================================
-# /START
-# ============================================================
+# =========================
+# START
+# =========================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user = update.effective_user
 
-    referred_by = None
-
-    # --------------------------------------------------------
-    # RÉCUPÉRATION DU LIEN DE PARRAINAGE
-    # --------------------------------------------------------
+    parrain = None
 
     if context.args:
 
-        referral_code = context.args[0]
+        try:
+            parrain = int(context.args[0])
+        except:
+            parrain = None
 
-        if referral_code.startswith("ref_"):
+    nouveau = create_user(
+        user,
+        parrain
+    )
 
-            try:
-                referred_by = int(
-                    referral_code.replace(
-                        "ref_",
-                        ""
-                    )
-                )
-
-            except ValueError:
-                referred_by = None
-
-    # Empêcher l'auto-parrainage
-    if referred_by == user.id:
-        referred_by = None
-
-    existing = get_user(user.id)
-
-    # --------------------------------------------------------
-    # NOUVEL UTILISATEUR
-    # --------------------------------------------------------
-
-    if not existing:
-
-        create_user(
-            user,
-            referred_by=referred_by
-        )
-
-        # ----------------------------------------------------
-        # BONUS DU PARRAIN
-        # ----------------------------------------------------
-
-        if referred_by:
-
-            # Vérifier que le parrain existe
-            sponsor = get_user(referred_by)
-
-            if sponsor:
-
-                conn = get_db()
-
-                conn.execute("""
-                    UPDATE users
-                    SET balance = balance + ?
-                    WHERE user_id = ?
-                """, (
-                    REFERRAL_BONUS,
-                    referred_by,
-                ))
-
-                conn.execute("""
-                    UPDATE users
-                    SET referral_paid = 1
-                    WHERE user_id = ?
-                """, (
-                    user.id,
-                ))
-
-                conn.commit()
-                conn.close()
-
-                # Informer le parrain
-                try:
-
-                    await context.bot.send_message(
-                        chat_id=referred_by,
-                        text=(
-                            "🎉 *NOUVEAU FILLEUL !*\n\n"
-                            f"👤 {user.first_name} vient "
-                            "de rejoindre votre équipe.\n\n"
-                            f"💰 Bonus : +{REFERRAL_BONUS} F\n\n"
-                            "Merci pour votre parrainage !"
-                        ),
-                        parse_mode="Markdown"
-                    )
-
-                except Exception as e:
-
-                    print(
-                        f"Impossible d'informer le parrain : {e}"
-                    )
-
-    else:
-
-        update_user_info(user)
-
-    # --------------------------------------------------------
-    # MESSAGE D'ACCUEIL
-    # --------------------------------------------------------
+    message = (
+        "🤖 Bienvenue sur YOHAN PREDICTION BOT !\n\n"
+        "🎁 Gagne de l'argent en invitant tes amis.\n"
+        f"💰 Chaque filleul rapporte {BONUS_PARRAIN} F.\n\n"
+        "👇 Choisis une option :"
+    )
 
     await update.message.reply_text(
-        "🤖 *Bienvenue sur YOHAN PREDICTION BOT !*\n\n"
-        "🎁 Gagnez de l'argent en invitant vos amis.\n\n"
-        f"💰 Chaque filleul vous rapporte "
-        f"*{REFERRAL_BONUS} F*.\n\n"
-        "👇 Choisissez une option dans le menu.",
-        parse_mode="Markdown",
-        reply_markup=main_keyboard()
+        message,
+        reply_markup=menu()
     )
 
 
-# ============================================================
+# =========================
 # MON SOLDE
-# ============================================================
+# =========================
 
-async def balance(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
+async def solde(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user = get_user(
         update.effective_user.id
     )
 
     if not user:
-
         await update.message.reply_text(
-            "❌ Votre compte n'existe pas encore.\n"
-            "Utilisez /start."
+            "Utilise /start d'abord."
         )
-
         return
 
-    username = (
-        f"@{user['username']}"
-        if user["username"]
-        else "Aucun"
-    )
-
     await update.message.reply_text(
-        "💰 *MON SOLDE*\n\n"
-        f"👤 Nom : {user['first_name']} "
-        f"{user['last_name'] or ''}\n"
-        f"🔗 Username : {username}\n"
-        f"🆔 ID Telegram : `{user['user_id']}`\n\n"
-        f"💵 Solde : *{user['balance']} F*\n\n"
-        f"📅 Date d'adhésion : "
-        f"{user['joined_at']}",
-        parse_mode="Markdown"
+        "💰 MON SOLDE\n\n"
+        f"👤 Nom : {user[1]}\n"
+        f"🔗 Username : @{user[2] if user[2] else 'Aucun'}\n"
+        f"🆔 ID : {user[0]}\n"
+        f"💵 Solde : {user[3]} F\n"
+        f"📅 Date d'adhésion : {user[5]}"
     )
 
 
-# ============================================================
+# =========================
 # INVITER
-# ============================================================
+# =========================
 
-async def invite(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
-
-    user_id = update.effective_user.id
+async def inviter(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     bot = await context.bot.get_me()
 
-    referral_link = (
-        f"https://t.me/{bot.username}"
-        f"?start=ref_{user_id}"
-    )
+    user_id = update.effective_user.id
+
+    lien = f"https://t.me/{bot.username}?start={user_id}"
 
     await update.message.reply_text(
-        "👥 *INVITER DES AMIS*\n\n"
-        f"💰 Chaque personne qui rejoint avec "
-        f"votre lien vous rapporte *{REFERRAL_BONUS} F*.\n\n"
-        "🔗 *Votre lien personnel :*\n\n"
-        f"`{referral_link}`\n\n"
-        "📢 Partagez ce lien avec vos amis.",
-        parse_mode="Markdown"
+        "👥 INVITER\n\n"
+        f"💰 Tu gagnes {BONUS_PARRAIN} F par filleul.\n\n"
+        "🔗 Ton lien :\n"
+        f"{lien}\n\n"
+        "Partage ce lien à tes amis."
     )
 
 
-# ============================================================
+# =========================
 # MES PARRAINÉS
-# ============================================================
+# =========================
 
-async def my_referrals(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
+async def parraines(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_user.id
 
-    conn = get_db()
+    conn = db()
+    cursor = conn.cursor()
 
-    referrals = conn.execute("""
-        SELECT *
+    cursor.execute("""
+        SELECT name, username, date
         FROM users
-        WHERE referred_by = ?
-        ORDER BY joined_at DESC
+        WHERE parrain = ?
     """, (
         user_id,
-    )).fetchall()
+    ))
+
+    users = cursor.fetchall()
 
     conn.close()
 
-    if not referrals:
+    if not users:
 
         await update.message.reply_text(
-            "👤 *MES PARRAINÉS*\n\n"
-            "Vous n'avez encore aucun filleul.",
-            parse_mode="Markdown"
+            "👤 MES PARRAINÉS\n\n"
+            "Tu n'as encore aucun filleul."
         )
 
         return
 
-    text = "👤 *MES PARRAINÉS*\n\n"
+    message = "👤 MES PARRAINÉS\n\n"
 
-    for index, referral in enumerate(
-        referrals,
-        1
-    ):
-
-        name = (
-            referral["first_name"]
-            or "Utilisateur"
-        )
+    for i, user in enumerate(users, 1):
 
         username = (
-            f"@{referral['username']}"
-            if referral["username"]
+            f"@{user[1]}"
+            if user[1]
             else "Aucun"
         )
 
-        text += (
-            f"{index}. 👤 {name}\n"
-            f"   🔗 {username}\n"
-            f"   🆔 `{referral['user_id']}`\n"
-            f"   📅 {referral['joined_at']}\n\n"
+        message += (
+            f"{i}. {user[0]}\n"
+            f"   {username}\n"
+            f"   📅 {user[2]}\n\n"
         )
 
-    text += (
-        f"💰 Bonus par filleul : "
-        f"{REFERRAL_BONUS} F"
-    )
-
     await update.message.reply_text(
-        text,
-        parse_mode="Markdown"
+        message
     )
 
 
-# ============================================================
-# AIDE
-# ============================================================
-
-async def help_command(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
-
-    await update.message.reply_text(
-        "❓ *AIDE — YOHAN PREDICTION BOT*\n\n"
-        "💰 *Mon solde*\n"
-        "Voir votre solde et vos informations.\n\n"
-        "💸 *Retrait*\n"
-        "Demander un retrait de votre solde.\n\n"
-        "👥 *Inviter*\n"
-        "Obtenir votre lien personnel de parrainage.\n\n"
-        "👤 *Mes parrainés*\n"
-        "Voir les personnes que vous avez invitées.\n\n"
-        "📌 *Parrainage*\n"
-        f"Chaque nouveau filleul vous rapporte "
-        f"{REFERRAL_BONUS} F.",
-        parse_mode="Markdown"
-    )
-
-
-# ============================================================
+# =========================
 # RETRAIT
-# ============================================================
+# =========================
 
-async def withdrawal_start(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
+async def retrait(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    today = datetime.now().weekday()
+    user = get_user(
+        update.effective_user.id
+    )
+
+    if not user:
+        return
+
+    aujourd_hui = datetime.now().weekday()
 
     # Mercredi = 2
     # Jeudi = 3
 
-    if today not in [2, 3]:
+    if aujourd_hui not in [2, 3]:
 
         await update.message.reply_text(
-            "❌ *RETRAITS FERMÉS*\n\n"
-            "Les retraits sont disponibles uniquement "
-            "le *mercredi et le jeudi*.",
-            parse_mode="Markdown"
+            "❌ Les retraits sont ouverts uniquement "
+            "le mercredi et le jeudi."
         )
 
         return
 
-    user = get_user(
-        update.effective_user.id
-    )
-
-    if not user:
+    if user[3] < MIN_RETRAIT:
 
         await update.message.reply_text(
-            "❌ Utilisateur introuvable.\n"
-            "Utilisez /start."
+            "❌ Solde insuffisant.\n\n"
+            f"💰 Ton solde : {user[3]} F\n"
+            f"📌 Minimum : {MIN_RETRAIT} F"
         )
 
         return
 
-    if user["balance"] < MIN_WITHDRAWAL:
-
-        await update.message.reply_text(
-            "❌ *SOLDE INSUFFISANT*\n\n"
-            f"💰 Votre solde : {user['balance']} F\n"
-            f"📌 Minimum de retrait : "
-            f"{MIN_WITHDRAWAL} F",
-            parse_mode="Markdown"
-        )
-
-        return
-
-    context.user_data[
-        "withdrawal_step"
-    ] = "amount"
+    context.user_data["retrait"] = True
 
     await update.message.reply_text(
-        "💸 *DEMANDE DE RETRAIT*\n\n"
-        f"💰 Solde disponible : {user['balance']} F\n"
-        f"📌 Montant minimum : {MIN_WITHDRAWAL} F\n\n"
-        "👉 Entrez le montant que vous souhaitez retirer :",
-        parse_mode="Markdown"
+        f"💸 RETRAIT\n\n"
+        f"💰 Ton solde : {user[3]} F\n"
+        f"📌 Minimum : {MIN_RETRAIT} F\n\n"
+        "Entre le montant à retirer :"
     )
 
 
-# ============================================================
-# TRAITEMENT DU RETRAIT
-# ============================================================
+# =========================
+# TRAITEMENT DES MESSAGES
+# =========================
 
-async def process_withdrawal(
+async def message_handler(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE
 ):
 
-    if "withdrawal_step" not in context.user_data:
-        return
+    text = update.message.text
 
-    user = get_user(
-        update.effective_user.id
-    )
-
-    if not user:
-        return
-
-    step = context.user_data[
-        "withdrawal_step"
-    ]
-
-    # ========================================================
-    # ÉTAPE 1 : MONTANT
-    # ========================================================
-
-    if step == "amount":
+    # RETRAIT EN COURS
+    if context.user_data.get("retrait"):
 
         try:
 
-            amount = int(
-                update.message.text
-                .replace(" ", "")
-                .replace("F", "")
-                .strip()
-            )
+            montant = int(text)
 
-        except ValueError:
+        except:
 
             await update.message.reply_text(
-                "❌ Montant invalide.\n\n"
-                "Entrez uniquement le montant.\n"
+                "❌ Entre seulement un nombre.\n"
                 "Exemple : 2000"
             )
 
             return
 
-        if amount < MIN_WITHDRAWAL:
+        user = get_user(
+            update.effective_user.id
+        )
+
+        if montant < MIN_RETRAIT:
 
             await update.message.reply_text(
-                f"❌ Le montant minimum est "
-                f"*{MIN_WITHDRAWAL} F*.",
-                parse_mode="Markdown"
+                f"❌ Le minimum est {MIN_RETRAIT} F."
             )
 
             return
 
-        if amount > user["balance"]:
+        if montant > user[3]:
 
             await update.message.reply_text(
-                "❌ *SOLDE INSUFFISANT*\n\n"
-                f"Votre solde est de "
-                f"{user['balance']} F.",
-                parse_mode="Markdown"
+                "❌ Tu n'as pas assez d'argent."
             )
 
             return
 
-        context.user_data[
-            "withdrawal_amount"
-        ] = amount
-
-        context.user_data[
-            "withdrawal_step"
-        ] = "phone"
+        context.user_data["montant"] = montant
+        context.user_data["retrait"] = False
+        context.user_data["numero"] = True
 
         await update.message.reply_text(
-            "📱 *NUMÉRO DE RÉCEPTION*\n\n"
-            "Entrez le numéro sur lequel vous "
-            "souhaitez recevoir votre argent.\n\n"
-            "Exemple : `90XXXXXX`",
-            parse_mode="Markdown"
+            "📱 Entre maintenant le numéro "
+            "sur lequel recevoir le retrait :"
         )
 
         return
 
-    # ========================================================
-    # ÉTAPE 2 : NUMÉRO
-    # ========================================================
+    # NUMÉRO DE RETRAIT
+    if context.user_data.get("numero"):
 
-    if step == "phone":
+        numero = text
 
-        phone = update.message.text.strip()
+        montant = context.user_data["montant"]
 
-        if len(phone) < 6:
+        conn = db()
+        cursor = conn.cursor()
 
-            await update.message.reply_text(
-                "❌ Numéro invalide.\n"
-                "Veuillez entrer un numéro valide."
-            )
-
-            return
-
-        amount = context.user_data[
-            "withdrawal_amount"
-        ]
-
-        # ----------------------------------------------------
-        # ENREGISTRER LA DEMANDE
-        # ----------------------------------------------------
-
-        conn = get_db()
-
-        cursor = conn.execute("""
-            INSERT INTO withdrawals (
-                user_id,
-                amount,
-                phone,
-                status,
-                created_at
-            )
-            VALUES (?, ?, ?, 'pending', ?)
+        cursor.execute("""
+            INSERT INTO retraits
+            (user_id, montant, numero, date, statut)
+            VALUES (?, ?, ?, ?, ?)
         """, (
-            user["user_id"],
-            amount,
-            phone,
+            update.effective_user.id,
+            montant,
+            numero,
             datetime.now().strftime(
-                "%Y-%m-%d %H:%M:%S"
+                "%d/%m/%Y %H:%M"
             ),
-        ))
-
-        withdrawal_id = cursor.lastrowid
-
-        conn.execute("""
-            UPDATE users
-            SET phone = ?
-            WHERE user_id = ?
-        """, (
-            phone,
-            user["user_id"],
+            "En attente"
         ))
 
         conn.commit()
@@ -669,171 +410,92 @@ async def process_withdrawal(
 
         context.user_data.clear()
 
-        # ----------------------------------------------------
-        # INFORMATIONS ADMIN
-        # ----------------------------------------------------
-
-        username = (
-            f"@{user['username']}"
-            if user["username"]
-            else "Aucun"
-        )
-
-        admin_text = (
-            "💸 *NOUVELLE DEMANDE DE RETRAIT*\n\n"
-            f"🆔 Demande : `{withdrawal_id}`\n\n"
-            f"👤 Nom : {user['first_name']} "
-            f"{user['last_name'] or ''}\n"
-            f"🔗 Username : {username}\n"
-            f"🆔 ID : `{user['user_id']}`\n\n"
-            f"💰 Montant : *{amount} F*\n"
-            f"📱 Numéro : `{phone}`\n\n"
-            f"📅 Date : "
-            f"{datetime.now().strftime('%d/%m/%Y %H:%M')}"
-        )
-
-        keyboard = [
-            [
-                InlineKeyboardButton(
-                    "✅ Valider",
-                    callback_data=(
-                        f"approve_{withdrawal_id}"
-                    )
-                ),
-                InlineKeyboardButton(
-                    "❌ Refuser",
-                    callback_data=(
-                        f"reject_{withdrawal_id}"
-                    )
-                ),
-            ]
-        ]
-
-        try:
-
-            await context.bot.send_message(
-                chat_id=int(ADMIN_ID),
-                text=admin_text,
-                parse_mode="Markdown",
-                reply_markup=InlineKeyboardMarkup(
-                    keyboard
-                )
-            )
-
-        except Exception as e:
-
-            print(
-                f"Erreur envoi administrateur : {e}"
-            )
-
         await update.message.reply_text(
-            "✅ *DEMANDE ENVOYÉE*\n\n"
-            f"💰 Montant : {amount} F\n"
-            f"📱 Numéro : {phone}\n\n"
-            "⏳ Votre demande est maintenant "
-            "en attente de validation.\n\n"
-            "Vous recevrez un message lorsque "
-            "l'administrateur aura traité votre demande.",
-            parse_mode="Markdown",
-            reply_markup=main_keyboard()
-        )
-
-
-# ============================================================
-# VALIDATION / REFUS DU RETRAIT
-# ============================================================
-
-async def withdrawal_action(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
-
-    query = update.callback_query
-
-    await query.answer()
-
-    # --------------------------------------------------------
-    # VÉRIFICATION ADMIN
-    # --------------------------------------------------------
-
-    if str(query.from_user.id) != str(ADMIN_ID):
-
-        await query.answer(
-            "❌ Vous n'êtes pas autorisé.",
-            show_alert=True
+            "✅ DEMANDE ENREGISTRÉE\n\n"
+            f"💰 Montant : {montant} F\n"
+            f"📱 Numéro : {numero}\n\n"
+            "⏳ Ta demande est en attente de traitement."
         )
 
         return
 
-    data = query.data
+    # MENU
+    if text == "💰 Mon solde":
+        await solde(update, context)
 
-    # ========================================================
-    # VALIDATION
-    # ========================================================
+    elif text == "💸 Retrait":
+        await retrait(update, context)
 
-    if data.startswith("approve_"):
+    elif text == "👥 Inviter":
+        await inviter(update, context)
 
-        withdrawal_id = int(
-            data.replace(
-                "approve_",
-                ""
-            )
+    elif text == "👤 Mes parrainés":
+        await parraines(update, context)
+
+    elif text == "❓ Aide":
+        await update.message.reply_text(
+            "📋 AIDE\n\n"
+            "/start — Démarrer le bot\n\n"
+            "💰 Mon solde — Voir ton argent\n\n"
+            "💸 Retrait — Demander un retrait\n\n"
+            "👥 Inviter — Inviter des amis\n\n"
+            "👤 Mes parrainés — Voir tes filleuls\n\n"
+            "📌 Retraits disponibles mercredi et jeudi.\n"
+            f"📌 Minimum de retrait : {MIN_RETRAIT} F."
         )
 
-        conn = get_db()
 
-        withdrawal = conn.execute("""
-            SELECT *
-            FROM withdrawals
-            WHERE id = ?
-        """, (
-            withdrawal_id,
-        )).fetchone()
+# =========================
+# MAIN
+# =========================
 
-        if not withdrawal:
+def main():
 
-            conn.close()
+    if not TOKEN:
+        raise ValueError(
+            "❌ TELEGRAM_TOKEN est introuvable. "
+            "Vérifie le secret TELEGRAM_TOKEN dans GitHub."
+        )
 
-            await query.edit_message_text(
-                "❌ Demande introuvable."
-            )
+    init_db()
 
-            return
+    app = (
+        Application.builder()
+        .token(TOKEN)
+        .build()
+    )
 
-        if withdrawal["status"] != "pending":
+    app.add_handler(
+        CommandHandler("start", start)
+    )
 
-            conn.close()
+    app.add_handler(
+        CommandHandler("help", 
+                       lambda update, context:
+                       help_command(update, context))
+    )
 
-            await query.answer(
-                "Cette demande a déjà été traitée.",
-                show_alert=True
-            )
+    app.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
+            message_handler
+        )
+    )
 
-            return
+    print(
+        "🤖 YOHAN PREDICTION BOT démarré..."
+    )
 
-        user = conn.execute("""
-            SELECT *
-            FROM users
-            WHERE user_id = ?
-        """, (
-            withdrawal["user_id"],
-        )).fetchone()
+    app.run_polling()
 
-        # ----------------------------------------------------
-        # VÉRIFICATION DU SOLDE
-        # ----------------------------------------------------
 
-        if user["balance"] < withdrawal["amount"]:
+async def help_command(update, context):
+    await update.message.reply_text(
+        "📋 COMMANDES\n\n"
+        "/start — Démarrer le bot\n"
+        "/help — Afficher l'aide"
+    )
 
-            conn.execute("""
-                UPDATE withdrawals
-                SET status = 'rejected'
-                WHERE id = ?
-            """, (
-                withdrawal_id,
-            ))
 
-            conn.commit()
-            conn.close()
-
-            await query.edit_message_
+if __name__ == "__main__":
+    main()
