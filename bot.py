@@ -1,34 +1,305 @@
 import os
+import random
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from telegram import Update, ReplyKeyboardMarkup
+from telegram import (
+    Update,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    ReplyKeyboardMarkup,
+)
 from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
+    CallbackQueryHandler,
     ContextTypes,
     filters,
 )
 
+
+# ============================================================
+# CONFIGURATION
+# ============================================================
+
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 
-DB = "bot.db"
+try:
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+except ValueError:
+    ADMIN_ID = 0
 
-BONUS_PARRAIN = 50
-MIN_RETRAIT = 2000
+DATABASE = "yohan_prediction.db"
 
 
-# =========================
+# ============================================================
+# COOLDOWN DES JEUX
+# ============================================================
+# IMPORTANT :
+# Chaque jeu possède son propre cooldown.
+# Les deux minuteries sont totalement indépendantes.
+
+LUCKY_JET_COOLDOWN = 5       # minutes
+ROCKET_QUEEN_COOLDOWN = 5    # minutes
+
+
+# ============================================================
+# PARAMÈTRES DES PRÉDICTIONS SIMULÉES
+# ============================================================
+
+TIME_MINUTES_MIN = 2
+TIME_MINUTES_MAX = 5
+
+ODDS_MIN = 9.80
+ODDS_MAX = 19.80
+
+SAFE_MIN = 2.00
+SAFE_MAX = 5.00
+
+
+# ============================================================
+# IMAGES DES JEUX
+# ============================================================
+
+LUCKY_JET_IMAGE = (
+    "https://i.ibb.co/yBSRtYvL/"
+    "IMG-20260730-145755-681.jpg"
+)
+
+ROCKET_QUEEN_IMAGE = (
+    "https://i.ibb.co/1xvTQr2/"
+    "IMG-20260730-145743-615.jpg"
+)
+
+
+# ============================================================
+# LANGUES
+# ============================================================
+
+TEXTS = {
+
+    "fr": {
+
+        "welcome":
+            "✨ <b>YOHAN PREDICTION BOT</b> ✨\n\n"
+            "Bienvenue sur notre plateforme de "
+            "prédictions simulées.\n\n"
+            "🎮 Choisis ton jeu et génère une "
+            "prédiction de démonstration.\n\n"
+            "⚠️ <b>AVERTISSEMENT</b>\n"
+            "Les résultats affichés sont générés "
+            "aléatoirement à titre démonstratif. "
+            "Ils ne garantissent pas le résultat réel "
+            "d'un jeu aléatoire.",
+
+        "games":
+            "🎮 <b>JEUX</b>\n\n"
+            "Sélectionne un jeu :",
+
+        "language":
+            "🌐 <b>LANGUE</b>\n\n"
+            "Choisis ta langue :",
+
+        "support":
+            "🆘 <b>SUPPORT</b>\n\n"
+            "Pour toute question concernant le bot, "
+            "contacte l'administrateur du projet.",
+
+        "how":
+            "ℹ️ <b>COMMENT ÇA MARCHE</b>\n\n"
+            "1️⃣ Sélectionne un jeu.\n\n"
+            "2️⃣ Appuie sur "
+            "🔮 <b>GÉNÉRER UNE PRÉDICTION</b>.\n\n"
+            "3️⃣ Le bot génère une simulation avec "
+            "une heure, un coefficient ODDS et un "
+            "niveau SAFE.\n\n"
+            "4️⃣ Tu peux utiliser "
+            "🔄 <b>PROCHAIN TOUR</b> lorsque le "
+            "cooldown du jeu est terminé.\n\n"
+            "⚠️ Ces résultats sont simulés et ne "
+            "constituent pas une garantie de résultat.",
+
+        "generate":
+            "🔮 GÉNÉRER UNE PRÉDICTION",
+
+        "next":
+            "🔄 PROCHAIN TOUR",
+
+        "menu":
+            "↩️ MENU PRINCIPAL",
+
+        "back":
+            "↩️ RETOUR",
+
+        "wait":
+            "🤖 <b>RÉCUPÉRATION DES DONNÉES "
+            "EN COURS...</b>\n\n"
+            "Veuillez réessayer dans "
+            "<b>{minutes} min {seconds} s</b>.",
+
+        "prediction":
+            "✨ <b>PRÉDICTIONS PREMIUM</b> ✨\n"
+            "┏━━━━━━━━━━━\n"
+            "┠ 《◆ TIME : {time} ⏰\n"
+            "┠\n"
+            "┠ 《◆ ODDS : {odds}X+ 🚀🚀\n"
+            "┠\n"
+            "┠ 《◆ SAFE : {safe}X+ ✅\n"
+            "┗━━━━━━━━━━━\n\n"
+            "🎮 Jeu : <b>{game}</b>\n\n"
+            "⚠️ <i>Simulation à titre démonstratif. "
+            "Ce signal ne garantit aucun résultat "
+            "réel.</i>",
+
+        "lucky":
+            "✈️ <b>LUCKY JET</b>\n\n"
+            "Système de prédiction simulée.\n\n"
+            "⚠️ Les signaux sont générés "
+            "aléatoirement à titre démonstratif.",
+
+        "rocket":
+            "🚀 <b>ROCKET QUEEN</b>\n\n"
+            "Système de prédiction simulée.\n\n"
+            "⚠️ Les signaux sont générés "
+            "aléatoirement à titre démonstratif.",
+
+        "language_changed":
+            "🇫🇷 Langue française sélectionnée.",
+
+        "not_registered":
+            "❌ Utilise /start pour commencer.",
+
+        "admin_denied":
+            "❌ Accès administrateur refusé.",
+
+        "admin":
+            "👑 <b>PANNEAU ADMINISTRATION</b>\n\n"
+            "👥 Utilisateurs : {users}\n"
+            "🟢 Actifs 24h : {active}\n"
+            "🔮 Prédictions : {predictions}\n\n"
+            "✈️ LUCKY JET : {lucky}\n"
+            "🚀 ROCKET QUEEN : {rocket}\n\n"
+            "🇫🇷 Français : {fr}\n"
+            "🇬🇧 English : {en}",
+    },
+
+
+    "en": {
+
+        "welcome":
+            "✨ <b>YOHAN PREDICTION BOT</b> ✨\n\n"
+            "Welcome to our simulated prediction "
+            "platform.\n\n"
+            "🎮 Choose your game and generate a "
+            "demonstration prediction.\n\n"
+            "⚠️ <b>DISCLAIMER</b>\n"
+            "Results are randomly generated for "
+            "demonstration purposes. They do not "
+            "guarantee the real outcome of a random game.",
+
+        "games":
+            "🎮 <b>GAMES</b>\n\n"
+            "Select a game:",
+
+        "language":
+            "🌐 <b>LANGUAGE</b>\n\n"
+            "Choose your language:",
+
+        "support":
+            "🆘 <b>SUPPORT</b>\n\n"
+            "For any question about the bot, "
+            "contact the project administrator.",
+
+        "how":
+            "ℹ️ <b>HOW IT WORKS</b>\n\n"
+            "1️⃣ Select a game.\n\n"
+            "2️⃣ Press "
+            "🔮 <b>GENERATE PREDICTION</b>.\n\n"
+            "3️⃣ The bot generates a simulation with "
+            "a time, an ODDS coefficient and a SAFE level.\n\n"
+            "4️⃣ You can use "
+            "🔄 <b>NEXT ROUND</b> when the cooldown "
+            "for that game is finished.\n\n"
+            "⚠️ These results are simulated and do "
+            "not guarantee any outcome.",
+
+        "generate":
+            "🔮 GENERATE PREDICTION",
+
+        "next":
+            "🔄 NEXT ROUND",
+
+        "menu":
+            "↩️ MAIN MENU",
+
+        "back":
+            "↩️ BACK",
+
+        "wait":
+            "🤖 <b>RETRIEVING DATA...</b>\n\n"
+            "Please try again in "
+            "<b>{minutes} min {seconds} sec</b>.",
+
+        "prediction":
+            "✨ <b>PREMIUM PREDICTIONS</b> ✨\n"
+            "┏━━━━━━━━━━━\n"
+            "┠ 《◆ TIME : {time} ⏰\n"
+            "┠\n"
+            "┠ 《◆ ODDS : {odds}X+ 🚀🚀\n"
+            "┠\n"
+            "┠ 《◆ SAFE : {safe}X+ ✅\n"
+            "┗━━━━━━━━━━━\n\n"
+            "🎮 Game: <b>{game}</b>\n\n"
+            "⚠️ <i>Demonstration simulation. "
+            "This signal does not guarantee any "
+            "real outcome.</i>",
+
+        "lucky":
+            "✈️ <b>LUCKY JET</b>\n\n"
+            "Simulated prediction system.\n\n"
+            "⚠️ Signals are randomly generated "
+            "for demonstration purposes.",
+
+        "rocket":
+            "🚀 <b>ROCKET QUEEN</b>\n\n"
+            "Simulated prediction system.\n\n"
+            "⚠️ Signals are randomly generated "
+            "for demonstration purposes.",
+
+        "language_changed":
+            "🇬🇧 English language selected.",
+
+        "not_registered":
+            "❌ Use /start to begin.",
+
+        "admin_denied":
+            "❌ Administrator access denied.",
+
+        "admin":
+            "👑 <b>ADMIN PANEL</b>\n\n"
+            "👥 Users: {users}\n"
+            "🟢 Active 24h: {active}\n"
+            "🔮 Predictions: {predictions}\n\n"
+            "✈️ LUCKY JET: {lucky}\n"
+            "🚀 ROCKET QUEEN: {rocket}\n\n"
+            "🇫🇷 French: {fr}\n"
+            "🇬🇧 English: {en}",
+    }
+}
+
+
+# ============================================================
 # BASE DE DONNÉES
-# =========================
+# ============================================================
 
-def db():
-    return sqlite3.connect(DB)
+def get_db():
+    return sqlite3.connect(DATABASE)
 
 
-def init_db():
-    conn = db()
+def init_database():
+
+    conn = get_db()
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -36,20 +307,22 @@ def init_db():
             id INTEGER PRIMARY KEY,
             name TEXT,
             username TEXT,
-            balance INTEGER DEFAULT 0,
-            parrain INTEGER,
-            date TEXT
+            language TEXT DEFAULT 'fr',
+            predictions INTEGER DEFAULT 0,
+            last_activity TEXT,
+            created_at TEXT
         )
     """)
 
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS retraits (
+        CREATE TABLE IF NOT EXISTS predictions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER,
-            montant INTEGER,
-            numero TEXT,
-            date TEXT,
-            statut TEXT
+            game TEXT,
+            odds REAL,
+            safe REAL,
+            signal_time TEXT,
+            created_at TEXT
         )
     """)
 
@@ -57,82 +330,220 @@ def init_db():
     conn.close()
 
 
-# =========================
-# UTILISATEUR
-# =========================
+# ============================================================
+# UTILISATEURS
+# ============================================================
 
-def get_user(user_id):
-    conn = db()
+def register_user(user):
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    now = datetime.now().strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
+
+    cursor.execute(
+        "SELECT id FROM users WHERE id = ?",
+        (user.id,)
+    )
+
+    exists = cursor.fetchone()
+
+    if exists:
+
+        cursor.execute("""
+            UPDATE users
+            SET name = ?,
+                username = ?,
+                last_activity = ?
+            WHERE id = ?
+        """, (
+            user.first_name,
+            user.username or "",
+            now,
+            user.id
+        ))
+
+    else:
+
+        cursor.execute("""
+            INSERT INTO users (
+                id,
+                name,
+                username,
+                language,
+                predictions,
+                last_activity,
+                created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            user.id,
+            user.first_name,
+            user.username or "",
+            "fr",
+            0,
+            now,
+            now
+        ))
+
+    conn.commit()
+    conn.close()
+
+
+def get_language(user_id):
+
+    conn = get_db()
     cursor = conn.cursor()
 
     cursor.execute(
-        "SELECT * FROM users WHERE id = ?",
+        "SELECT language FROM users WHERE id = ?",
         (user_id,)
     )
 
-    user = cursor.fetchone()
+    result = cursor.fetchone()
 
     conn.close()
 
-    return user
+    if result:
+        return result[0]
+
+    return "fr"
 
 
-def create_user(user, parrain=None):
+def set_language(user_id, language):
 
-    if get_user(user.id):
-        return False
-
-    conn = db()
+    conn = get_db()
     cursor = conn.cursor()
 
     cursor.execute("""
-        INSERT INTO users
-        (id, name, username, balance, parrain, date)
-        VALUES (?, ?, ?, ?, ?, ?)
+        UPDATE users
+        SET language = ?
+        WHERE id = ?
     """, (
-        user.id,
-        user.first_name,
-        user.username or "",
-        0,
-        parrain,
-        datetime.now().strftime("%d/%m/%Y %H:%M")
+        language,
+        user_id
     ))
-
-    # Donner 50 F au parrain
-    if parrain and parrain != user.id:
-
-        cursor.execute(
-            "SELECT id FROM users WHERE id = ?",
-            (parrain,)
-        )
-
-        if cursor.fetchone():
-
-            cursor.execute("""
-                UPDATE users
-                SET balance = balance + ?
-                WHERE id = ?
-            """, (
-                BONUS_PARRAIN,
-                parrain
-            ))
 
     conn.commit()
     conn.close()
 
-    return True
+
+# ============================================================
+# STATISTIQUES
+# ============================================================
+
+def save_prediction(
+    user_id,
+    game,
+    odds,
+    safe,
+    signal_time
+):
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    now = datetime.now().strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
+
+    cursor.execute("""
+        UPDATE users
+        SET predictions = predictions + 1,
+            last_activity = ?
+        WHERE id = ?
+    """, (
+        now,
+        user_id
+    ))
+
+    cursor.execute("""
+        INSERT INTO predictions (
+            user_id,
+            game,
+            odds,
+            safe,
+            signal_time,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        user_id,
+        game,
+        odds,
+        safe,
+        signal_time,
+        now
+    ))
+
+    conn.commit()
+    conn.close()
 
 
-# =========================
-# MENU
-# =========================
+# ============================================================
+# MENUS
+# ============================================================
 
-def menu():
+def main_menu(language):
+
+    if language == "en":
+
+        keyboard = [
+            ["🎮 GAMES"],
+            ["🌐 LANGUAGE", "🆘 SUPPORT"],
+            ["ℹ️ HOW IT WORKS"]
+        ]
+
+    else:
+
+        keyboard = [
+            ["🎮 JEUX"],
+            ["🌐 LANGUE", "🆘 SUPPORT"],
+            ["ℹ️ COMMENT ÇA MARCHE"]
+        ]
+
+    return ReplyKeyboardMarkup(
+        keyboard,
+        resize_keyboard=True
+    )
+
+
+def games_menu(language):
+
+    if language == "en":
+
+        keyboard = [
+            ["✈️ LUCKY JET"],
+            ["🚀 ROCKET QUEEN"],
+            ["↩️ BACK"]
+        ]
+
+    else:
+
+        keyboard = [
+            ["✈️ LUCKY JET"],
+            ["🚀 ROCKET QUEEN"],
+            ["↩️ RETOUR"]
+        ]
+
+    return ReplyKeyboardMarkup(
+        keyboard,
+        resize_keyboard=True
+    )
+
+
+def language_menu():
 
     keyboard = [
-        ["💰 Mon solde", "💸 Retrait"],
-        ["👥 Inviter", "❓ Aide"],
-        ["👤 Mes parrainés"],
+        [
+            "🇫🇷 Français",
+            "🇬🇧 English"
+        ],
+        [
+            "↩️ Retour"
+        ]
     ]
 
     return ReplyKeyboardMarkup(
@@ -141,361 +552,353 @@ def menu():
     )
 
 
-# =========================
-# START
-# =========================
+def game_buttons(language):
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if language == "en":
 
-    user = update.effective_user
+        return InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton(
+                    "🔮 GENERATE PREDICTION",
+                    callback_data="generate"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    "🔄 NEXT ROUND",
+                    callback_data="next"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    "↩️ MAIN MENU",
+                    callback_data="main_menu"
+                )
+            ]
+        ])
 
-    parrain = None
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                "🔮 GÉNÉRER UNE PRÉDICTION",
+                callback_data="generate"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "🔄 PROCHAIN TOUR",
+                callback_data="next"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "↩️ MENU PRINCIPAL",
+                callback_data="main_menu"
+            )
+        ]
+    ])
 
-    if context.args:
 
-        try:
-            parrain = int(context.args[0])
-        except:
-            parrain = None
+# ============================================================
+# GÉNÉRATION SIMULÉE
+# ============================================================
 
-    nouveau = create_user(
-        user,
-        parrain
+def generate_signal():
+
+    random_minutes = random.randint(
+        TIME_MINUTES_MIN,
+        TIME_MINUTES_MAX
     )
 
-    message = (
-        "🤖 Bienvenue sur YOHAN PREDICTION BOT !\n\n"
-        "🎁 Gagne de l'argent en invitant tes amis.\n"
-        f"💰 Chaque filleul rapporte {BONUS_PARRAIN} F.\n\n"
-        "👇 Choisis une option :"
+    signal_date = (
+        datetime.now()
+        + timedelta(minutes=random_minutes)
     )
 
-    await update.message.reply_text(
-        message,
-        reply_markup=menu()
+    signal_time = signal_date.strftime(
+        "%H:%M"
     )
 
-
-# =========================
-# MON SOLDE
-# =========================
-
-async def solde(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    user = get_user(
-        update.effective_user.id
+    odds_cents = random.randint(
+        int(ODDS_MIN * 100),
+        int(ODDS_MAX * 100)
     )
 
-    if not user:
-        await update.message.reply_text(
-            "Utilise /start d'abord."
-        )
-        return
+    odds = odds_cents / 100
 
-    await update.message.reply_text(
-        "💰 MON SOLDE\n\n"
-        f"👤 Nom : {user[1]}\n"
-        f"🔗 Username : @{user[2] if user[2] else 'Aucun'}\n"
-        f"🆔 ID : {user[0]}\n"
-        f"💵 Solde : {user[3]} F\n"
-        f"📅 Date d'adhésion : {user[5]}"
+    safe_cents = random.randint(
+        int(SAFE_MIN * 100),
+        int(SAFE_MAX * 100)
     )
 
+    safe = safe_cents / 100
 
-# =========================
-# INVITER
-# =========================
-
-async def inviter(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    bot = await context.bot.get_me()
-
-    user_id = update.effective_user.id
-
-    lien = f"https://t.me/{bot.username}?start={user_id}"
-
-    await update.message.reply_text(
-        "👥 INVITER\n\n"
-        f"💰 Tu gagnes {BONUS_PARRAIN} F par filleul.\n\n"
-        "🔗 Ton lien :\n"
-        f"{lien}\n\n"
-        "Partage ce lien à tes amis."
-    )
+    return signal_time, odds, safe
 
 
-# =========================
-# MES PARRAINÉS
-# =========================
+# ============================================================
+# COOLDOWN INDÉPENDANT
+# ============================================================
 
-async def parraines(update: Update, context: ContextTypes.DEFAULT_TYPE):
+def get_cooldown(game):
 
-    user_id = update.effective_user.id
+    if game == "luckyjet":
+        return LUCKY_JET_COOLDOWN * 60
 
-    conn = db()
-    cursor = conn.cursor()
+    if game == "rocketqueen":
+        return ROCKET_QUEEN_COOLDOWN * 60
 
-    cursor.execute("""
-        SELECT name, username, date
-        FROM users
-        WHERE parrain = ?
-    """, (
-        user_id,
-    ))
-
-    users = cursor.fetchall()
-
-    conn.close()
-
-    if not users:
-
-        await update.message.reply_text(
-            "👤 MES PARRAINÉS\n\n"
-            "Tu n'as encore aucun filleul."
-        )
-
-        return
-
-    message = "👤 MES PARRAINÉS\n\n"
-
-    for i, user in enumerate(users, 1):
-
-        username = (
-            f"@{user[1]}"
-            if user[1]
-            else "Aucun"
-        )
-
-        message += (
-            f"{i}. {user[0]}\n"
-            f"   {username}\n"
-            f"   📅 {user[2]}\n\n"
-        )
-
-    await update.message.reply_text(
-        message
-    )
+    return 0
 
 
-# =========================
-# RETRAIT
-# =========================
-
-async def retrait(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    user = get_user(
-        update.effective_user.id
-    )
-
-    if not user:
-        return
-
-    aujourd_hui = datetime.now().weekday()
-
-    # Mercredi = 2
-    # Jeudi = 3
-
-    if aujourd_hui not in [2, 3]:
-
-        await update.message.reply_text(
-            "❌ Les retraits sont ouverts uniquement "
-            "le mercredi et le jeudi."
-        )
-
-        return
-
-    if user[3] < MIN_RETRAIT:
-
-        await update.message.reply_text(
-            "❌ Solde insuffisant.\n\n"
-            f"💰 Ton solde : {user[3]} F\n"
-            f"📌 Minimum : {MIN_RETRAIT} F"
-        )
-
-        return
-
-    context.user_data["retrait"] = True
-
-    await update.message.reply_text(
-        f"💸 RETRAIT\n\n"
-        f"💰 Ton solde : {user[3]} F\n"
-        f"📌 Minimum : {MIN_RETRAIT} F\n\n"
-        "Entre le montant à retirer :"
-    )
-
-
-# =========================
-# TRAITEMENT DES MESSAGES
-# =========================
-
-async def message_handler(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
+def check_cooldown(
+    context,
+    game
 ):
 
-    text = update.message.text
+    # Chaque jeu possède sa propre clé.
+    #
+    # Lucky Jet :
+    # last_signal_luckyjet
+    #
+    # Rocket Queen :
+    # last_signal_rocketqueen
 
-    # RETRAIT EN COURS
-    if context.user_data.get("retrait"):
+    key = f"last_signal_{game}"
 
-        try:
+    last_time = context.user_data.get(key)
 
-            montant = int(text)
+    if not last_time:
+        return True, 0
 
-        except:
+    cooldown = get_cooldown(game)
 
-            await update.message.reply_text(
-                "❌ Entre seulement un nombre.\n"
-                "Exemple : 2000"
-            )
+    elapsed = (
+        datetime.now() - last_time
+    ).total_seconds()
 
-            return
+    remaining = cooldown - elapsed
 
-        user = get_user(
-            update.effective_user.id
-        )
+    if remaining <= 0:
+        return True, 0
 
-        if montant < MIN_RETRAIT:
+    return False, int(remaining)
 
-            await update.message.reply_text(
-                f"❌ Le minimum est {MIN_RETRAIT} F."
-            )
 
-            return
+# ============================================================
+# AFFICHER UN JEU
+# ============================================================
 
-        if montant > user[3]:
+async def show_game(
+    update,
+    context,
+    game
+):
 
-            await update.message.reply_text(
-                "❌ Tu n'as pas assez d'argent."
-            )
+    user_id = update.effective_user.id
 
-            return
+    language = get_language(user_id)
 
-        context.user_data["montant"] = montant
-        context.user_data["retrait"] = False
-        context.user_data["numero"] = True
+    context.user_data["game"] = game
+
+    if game == "luckyjet":
+
+        text = TEXTS[language]["lucky"]
+        image = LUCKY_JET_IMAGE
+
+    else:
+
+        text = TEXTS[language]["rocket"]
+        image = ROCKET_QUEEN_IMAGE
+
+    await update.message.reply_photo(
+        photo=image,
+        caption=text,
+        parse_mode="HTML",
+        reply_markup=game_buttons(language)
+    )
+
+
+# ============================================================
+# GÉNÉRER UNE PRÉDICTION
+# ============================================================
+
+async def generate_prediction(
+    update,
+    context
+):
+
+    user_id = update.effective_user.id
+
+    language = get_language(user_id)
+
+    game = context.user_data.get("game")
+
+    if not game:
 
         await update.message.reply_text(
-            "📱 Entre maintenant le numéro "
-            "sur lequel recevoir le retrait :"
+            TEXTS[language]["games"],
+            parse_mode="HTML",
+            reply_markup=games_menu(language)
         )
 
         return
 
-    # NUMÉRO DE RETRAIT
-    if context.user_data.get("numero"):
+    allowed, remaining = check_cooldown(
+        context,
+        game
+    )
 
-        numero = text
+    if not allowed:
 
-        montant = context.user_data["montant"]
-
-        conn = db()
-        cursor = conn.cursor()
-
-        cursor.execute("""
-            INSERT INTO retraits
-            (user_id, montant, numero, date, statut)
-            VALUES (?, ?, ?, ?, ?)
-        """, (
-            update.effective_user.id,
-            montant,
-            numero,
-            datetime.now().strftime(
-                "%d/%m/%Y %H:%M"
-            ),
-            "En attente"
-        ))
-
-        conn.commit()
-        conn.close()
-
-        context.user_data.clear()
+        minutes = remaining // 60
+        seconds = remaining % 60
 
         await update.message.reply_text(
-            "✅ DEMANDE ENREGISTRÉE\n\n"
-            f"💰 Montant : {montant} F\n"
-            f"📱 Numéro : {numero}\n\n"
-            "⏳ Ta demande est en attente de traitement."
+            TEXTS[language]["wait"].format(
+                minutes=minutes,
+                seconds=seconds
+            )
         )
 
         return
 
-    # MENU
-    if text == "💰 Mon solde":
-        await solde(update, context)
+    signal_time, odds, safe = generate_signal()
 
-    elif text == "💸 Retrait":
-        await retrait(update, context)
+    # IMPORTANT :
+    # On enregistre le cooldown uniquement
+    # pour le jeu actuellement utilisé.
 
-    elif text == "👥 Inviter":
-        await inviter(update, context)
+    context.user_data[
+        f"last_signal_{game}"
+    ] = datetime.now()
 
-    elif text == "👤 Mes parrainés":
-        await parraines(update, context)
+    if game == "luckyjet":
 
-    elif text == "❓ Aide":
-        await update.message.reply_text(
-            "📋 AIDE\n\n"
-            "/start — Démarrer le bot\n\n"
-            "💰 Mon solde — Voir ton argent\n\n"
-            "💸 Retrait — Demander un retrait\n\n"
-            "👥 Inviter — Inviter des amis\n\n"
-            "👤 Mes parrainés — Voir tes filleuls\n\n"
-            "📌 Retraits disponibles mercredi et jeudi.\n"
-            f"📌 Minimum de retrait : {MIN_RETRAIT} F."
+        game_name = "LUCKY JET"
+        image = LUCKY_JET_IMAGE
+
+    else:
+
+        game_name = "ROCKET QUEEN"
+        image = ROCKET_QUEEN_IMAGE
+
+    message = TEXTS[language]["prediction"].format(
+        time=signal_time,
+        odds=f"{odds:.2f}",
+        safe=f"{safe:.2f}",
+        game=game_name
+    )
+
+    save_prediction(
+        user_id,
+        game,
+        odds,
+        safe,
+        signal_time
+    )
+
+    await update.message.reply_photo(
+        photo=image,
+        caption=message,
+        parse_mode="HTML",
+        reply_markup=game_buttons(language)
+    )
+
+
+# ============================================================
+# CALLBACK DES BOUTONS
+# ============================================================
+
+async def button_handler(
+    update,
+    context
+):
+
+    query = update.callback_query
+
+    await query.answer()
+
+    user = query.from_user
+
+    register_user(user)
+
+    language = get_language(user.id)
+
+    data = query.data
+
+    # ========================================================
+    # GÉNÉRER / PROCHAIN TOUR
+    # ========================================================
+
+    if data in ["generate", "next"]:
+
+        game = context.user_data.get("game")
+
+        if not game:
+            return
+
+        allowed, remaining = check_cooldown(
+            context,
+            game
         )
 
+        if not allowed:
 
-# =========================
-# MAIN
-# =========================
+            minutes = remaining // 60
+            seconds = remaining % 60
 
-def main():
+            await query.message.reply_text(
+                TEXTS[language]["wait"].format(
+                    minutes=minutes,
+                    seconds=seconds
+                )
+            )
 
-    if not TOKEN:
-        raise ValueError(
-            "❌ TELEGRAM_TOKEN est introuvable. "
-            "Vérifie le secret TELEGRAM_TOKEN dans GitHub."
+            return
+
+        signal_time, odds, safe = generate_signal()
+
+        # ====================================================
+        # COOLDOWN INDÉPENDANT
+        # ====================================================
+
+        context.user_data[
+            f"last_signal_{game}"
+        ] = datetime.now()
+
+        if game == "luckyjet":
+
+            game_name = "LUCKY JET"
+            image = LUCKY_JET_IMAGE
+
+        else:
+
+            game_name = "ROCKET QUEEN"
+            image = ROCKET_QUEEN_IMAGE
+
+        message = TEXTS[language]["prediction"].format(
+            time=signal_time,
+            odds=f"{odds:.2f}",
+            safe=f"{safe:.2f}",
+            game=game_name
         )
 
-    init_db()
-
-    app = (
-        Application.builder()
-        .token(TOKEN)
-        .build()
-    )
-
-    app.add_handler(
-        CommandHandler("start", start)
-    )
-
-    app.add_handler(
-        CommandHandler("help", 
-                       lambda update, context:
-                       help_command(update, context))
-    )
-
-    app.add_handler(
-        MessageHandler(
-            filters.TEXT & ~filters.COMMAND,
-            message_handler
+        save_prediction(
+            user.id,
+            game,
+            odds,
+            safe,
+            signal_time
         )
-    )
 
-    print(
-        "🤖 YOHAN PREDICTION BOT démarré..."
-    )
+        await query.message.reply_photo(
+            photo=image,
+            caption=message,
+            parse_mode="HTML",
+            reply_markup=game_buttons(language)
+        )
 
-    app.run_polling()
+        return
 
-
-async def help_command(update, context):
-    await update.message.reply_text(
-        "📋 COMMANDES\n\n"
-        "/start — Démarrer le bot\n"
-        "/help — Afficher l'aide"
-    )
-
-
-if __name__ == "__main__":
-    main()
+    # =====
