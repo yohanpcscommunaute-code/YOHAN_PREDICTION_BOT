@@ -4,9 +4,17 @@ from datetime import datetime, timedelta
 DATABASE = "yohan_prediction.db"
 
 
+# ============================================================
+# CONNEXION
+# ============================================================
+
 def get_db():
     return sqlite3.connect(DATABASE)
 
+
+# ============================================================
+# INITIALISATION
+# ============================================================
 
 def init_database():
     conn = get_db()
@@ -40,6 +48,10 @@ def init_database():
     conn.close()
 
 
+# ============================================================
+# UTILISATEURS
+# ============================================================
+
 def register_user(user):
     conn = get_db()
     cursor = conn.cursor()
@@ -56,6 +68,7 @@ def register_user(user):
     exists = cursor.fetchone()
 
     if exists:
+
         cursor.execute("""
             UPDATE users
             SET name = ?,
@@ -68,7 +81,9 @@ def register_user(user):
             now,
             user.id
         ))
+
     else:
+
         cursor.execute("""
             INSERT INTO users (
                 id,
@@ -92,7 +107,12 @@ def register_user(user):
     conn.close()
 
 
+# ============================================================
+# LANGUE
+# ============================================================
+
 def get_language(user_id):
+
     conn = get_db()
     cursor = conn.cursor()
 
@@ -105,10 +125,29 @@ def get_language(user_id):
 
     conn.close()
 
-    return result[0] if result else "fr"
+    if result and result[0]:
+        return result[0]
+
+    return "fr"
 
 
 def set_language(user_id, language):
+
+    allowed_languages = [
+        "fr",
+        "en",
+        "es",
+        "la",
+        "ar",
+        "pt",
+        "zh",
+        "hi",
+        "ru",
+    ]
+
+    if language not in allowed_languages:
+        return False
+
     conn = get_db()
     cursor = conn.cursor()
 
@@ -116,11 +155,46 @@ def set_language(user_id, language):
         UPDATE users
         SET language = ?
         WHERE id = ?
-    """, (language, user_id))
+    """, (
+        language,
+        user_id
+    ))
 
     conn.commit()
     conn.close()
 
+    return True
+
+
+# ============================================================
+# ACTIVITÉ
+# ============================================================
+
+def update_activity(user_id):
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    now = datetime.now().strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
+
+    cursor.execute("""
+        UPDATE users
+        SET last_activity = ?
+        WHERE id = ?
+    """, (
+        now,
+        user_id
+    ))
+
+    conn.commit()
+    conn.close()
+
+
+# ============================================================
+# PRÉDICTIONS
+# ============================================================
 
 def save_prediction(
     user_id,
@@ -129,6 +203,7 @@ def save_prediction(
     safe,
     signal_time
 ):
+
     conn = get_db()
     cursor = conn.cursor()
 
@@ -141,7 +216,10 @@ def save_prediction(
         SET predictions = predictions + 1,
             last_activity = ?
         WHERE id = ?
-    """, (now, user_id))
+    """, (
+        now,
+        user_id
+    ))
 
     cursor.execute("""
         INSERT INTO predictions (
@@ -166,15 +244,23 @@ def save_prediction(
     conn.close()
 
 
+# ============================================================
+# STATISTIQUES
+# ============================================================
+
 def get_statistics():
+
     conn = get_db()
     cursor = conn.cursor()
 
+    # Nombre total d'utilisateurs
     cursor.execute(
         "SELECT COUNT(*) FROM users"
     )
+
     users = cursor.fetchone()[0]
 
+    # Utilisateurs actifs durant les dernières 24 heures
     limit = (
         datetime.now() - timedelta(hours=24)
     ).strftime("%Y-%m-%d %H:%M:%S")
@@ -183,29 +269,29 @@ def get_statistics():
         SELECT COUNT(*)
         FROM users
         WHERE last_activity >= ?
-    """, (limit,))
+    """, (
+        limit,
+    ))
 
     active = cursor.fetchone()[0]
 
+    # Nombre total de prédictions
     cursor.execute(
         "SELECT COUNT(*) FROM predictions"
     )
+
     predictions = cursor.fetchone()[0]
 
+    # Statistiques par jeu
     cursor.execute("""
-        SELECT COUNT(*)
+        SELECT game, COUNT(*)
         FROM predictions
-        WHERE game = 'luckyjet'
+        GROUP BY game
     """)
-    lucky = cursor.fetchone()[0]
 
-    cursor.execute("""
-        SELECT COUNT(*)
-        FROM predictions
-        WHERE game = 'rocketqueen'
-    """)
-    rocket = cursor.fetchone()[0]
+    games = dict(cursor.fetchall())
 
+    # Statistiques par langue
     cursor.execute("""
         SELECT language, COUNT(*)
         FROM users
@@ -220,8 +306,6 @@ def get_statistics():
         "users": users,
         "active": active,
         "predictions": predictions,
-        "lucky": lucky,
-        "rocket": rocket,
-        "fr": languages.get("fr", 0),
-        "en": languages.get("en", 0)
-  }
+        "games": games,
+        "languages": languages,
+        }
