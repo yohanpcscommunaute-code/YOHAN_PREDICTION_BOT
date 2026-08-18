@@ -1,4 +1,7 @@
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+)
 
 from config import (
     MEGAPARI_REGISTER_URL,
@@ -7,32 +10,50 @@ from config import (
 )
 
 
+# ============================================================
+# MESSAGE INSCRIPTION + DÉPÔT
+# ============================================================
+
 def megapari_message(language="fr"):
-    """
-    Message affiché avant l'accès au menu principal.
-    """
 
     texts = {
+
         "fr": (
-            "🎯 <b>ÉTAPE D'INSCRIPTION</b>\n\n"
-            "Pour continuer, inscris-toi sur Megapari "
-            "avec le code promo :\n\n"
-            f"🎁 <b>{MEGAPARI_PROMO_CODE}</b>\n\n"
-            f"💰 Dépôt minimum demandé : "
-            f"<b>{MEGAPARI_MIN_DEPOSIT} F</b>\n\n"
-            "Après ton inscription, utilise le bouton "
-            "ci-dessous pour continuer."
+            "🎯 <b>ACCÈS AU YOHAN PREDICTION BOT</b>\n\n"
+
+            "Pour accéder aux fonctions du bot, "
+            "tu dois effectuer les deux étapes suivantes :\n\n"
+
+            "1️⃣ <b>Créer ton compte Megapari</b>\n"
+            f"🎁 Code promo : <b>{MEGAPARI_PROMO_CODE}</b>\n\n"
+
+            "2️⃣ <b>Effectuer le dépôt minimum demandé</b>\n"
+            f"💰 Minimum : <b>{MEGAPARI_MIN_DEPOSIT} F</b>\n\n"
+
+            "Après ces étapes, utilise les boutons "
+            "de vérification ci-dessous.\n\n"
+
+            "🔐 L'accès sera accordé uniquement lorsque "
+            "les deux vérifications seront confirmées."
         ),
 
         "en": (
-            "🎯 <b>REGISTRATION</b>\n\n"
-            "To continue, register on Megapari "
-            "using the promo code:\n\n"
-            f"🎁 <b>{MEGAPARI_PROMO_CODE}</b>\n\n"
-            f"💰 Minimum deposit: "
-            f"<b>{MEGAPARI_MIN_DEPOSIT} F</b>\n\n"
-            "After registering, use the button "
-            "below to continue."
+            "🎯 <b>YOHAN PREDICTION BOT ACCESS</b>\n\n"
+
+            "To access the bot features, you must "
+            "complete both steps:\n\n"
+
+            "1️⃣ <b>Create your Megapari account</b>\n"
+            f"🎁 Promo code: <b>{MEGAPARI_PROMO_CODE}</b>\n\n"
+
+            "2️⃣ <b>Make the required minimum deposit</b>\n"
+            f"💰 Minimum: <b>{MEGAPARI_MIN_DEPOSIT} F</b>\n\n"
+
+            "After completing these steps, use the "
+            "verification buttons below.\n\n"
+
+            "🔐 Access will only be granted after "
+            "both verifications are confirmed."
         ),
     }
 
@@ -42,18 +63,27 @@ def megapari_message(language="fr"):
     )
 
 
+# ============================================================
+# CLAVIER
+# ============================================================
+
 def megapari_keyboard(language="fr"):
 
     labels = {
+
         "fr": {
             "register": "📝 S'INSCRIRE SUR MEGAPARI",
-            "verify": "✅ VÉRIFIER L'INSCRIPTION",
+            "deposit": "💰 EFFECTUER LE DÉPÔT",
+            "verify_registration": "✅ VÉRIFIER L'INSCRIPTION",
+            "verify_deposit": "💳 VÉRIFIER LE DÉPÔT",
             "back": "↩️ RETOUR",
         },
 
         "en": {
             "register": "📝 REGISTER ON MEGAPARI",
-            "verify": "✅ VERIFY REGISTRATION",
+            "deposit": "💰 MAKE DEPOSIT",
+            "verify_registration": "✅ VERIFY REGISTRATION",
+            "verify_deposit": "💳 VERIFY DEPOSIT",
             "back": "↩️ BACK",
         },
     }
@@ -74,8 +104,22 @@ def megapari_keyboard(language="fr"):
 
         [
             InlineKeyboardButton(
-                lang["verify"],
+                lang["deposit"],
+                url=MEGAPARI_REGISTER_URL
+            )
+        ],
+
+        [
+            InlineKeyboardButton(
+                lang["verify_registration"],
                 callback_data="verify_megapari"
+            )
+        ],
+
+        [
+            InlineKeyboardButton(
+                lang["verify_deposit"],
+                callback_data="verify_deposit"
             )
         ],
 
