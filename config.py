@@ -7,44 +7,36 @@ import os
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 
-ADMIN_ID = int(
-    os.getenv("ADMIN_ID", "0")
+
+# =========================
+# MEGAPARI
+# =========================
+
+MEGAPARI_API_TOKEN = os.getenv(
+    "MEGAPARI_API_TOKEN"
+)
+
+MEGAPARI_MERCHANT_ID = os.getenv(
+    "MEGAPARI_MERCHANT_ID",
+    "6"
 )
 
 
 # =========================
-# COOLDOWNS
+# INSCRIPTION
 # =========================
 
-LUCKY_JET_COOLDOWN = 5 * 60
-
-ROCKET_QUEEN_COOLDOWN = 5 * 60
-
-
-# =========================
-# PREDICTIONS
-# =========================
-
-TIME_MINUTES_MIN = 2
-TIME_MINUTES_MAX = 5
-
-ODDS_MIN = 9.80
-ODDS_MAX = 19.80
-
-SAFE_MIN = 2.00
-SAFE_MAX = 5.00
-
-
-# =========================
-# IMAGES
-# =========================
-
-LUCKY_JET_IMAGE = (
-    "https://i.ibb.co/yBSRtYvL/"
-    "IMG-20260730-145755-681.jpg"
+MEGAPARI_REGISTER_URL = (
+    "https://3773080.megapari-104631.in"
 )
 
-ROCKET_QUEEN_IMAGE = (
-    "https://i.ibb.co/1xvTQr2/"
-    "IMG-20260730-145743-615.jpg"
-)
+MEGAPARI_PROMO_CODE = "SB55"
+
+MEGAPARI_MIN_DEPOSIT = 5000
+
+
+# =========================
+# BOT
+# =========================
+
+BOT_NAME = "YOHAN PREDICTION BOT"
