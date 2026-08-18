@@ -28,9 +28,27 @@ def init_database():
             language TEXT DEFAULT 'fr',
             predictions INTEGER DEFAULT 0,
             last_activity TEXT,
-            created_at TEXT
+            created_at TEXT,
+            registration_verified INTEGER DEFAULT 0,
+            deposit_verified INTEGER DEFAULT 0
         )
     """)
+
+    # Migration des anciennes bases
+    cursor.execute("PRAGMA table_info(users)")
+    columns = [row[1] for row in cursor.fetchall()]
+
+    if "registration_verified" not in columns:
+        cursor.execute("""
+            ALTER TABLE users
+            ADD COLUMN registration_verified INTEGER DEFAULT 0
+        """)
+
+    if "deposit_verified" not in columns:
+        cursor.execute("""
+            ALTER TABLE users
+            ADD COLUMN deposit_verified INTEGER DEFAULT 0
+        """)
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS predictions (
@@ -49,10 +67,11 @@ def init_database():
 
 
 # ============================================================
-# UTILISATEURS
+# UTILISATEUR
 # ============================================================
 
 def register_user(user):
+
     conn = get_db()
     cursor = conn.cursor()
 
@@ -92,9 +111,11 @@ def register_user(user):
                 language,
                 predictions,
                 last_activity,
-                created_at
+                created_at,
+                registration_verified,
+                deposit_verified
             )
-            VALUES (?, ?, ?, 'fr', 0, ?, ?)
+            VALUES (?, ?, ?, 'fr', 0, ?, ?, 0, 0)
         """, (
             user.id,
             user.first_name,
@@ -108,6 +129,126 @@ def register_user(user):
 
 
 # ============================================================
+# STATUT INSCRIPTION
+# ============================================================
+
+def is_registration_verified(user_id):
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT registration_verified
+        FROM users
+        WHERE id = ?
+    """, (user_id,))
+
+    result = cursor.fetchone()
+
+    conn.close()
+
+    return bool(result and result[0])
+
+
+def set_registration_verified(
+    user_id,
+    verified=True
+):
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE users
+        SET registration_verified = ?
+        WHERE id = ?
+    """, (
+        1 if verified else 0,
+        user_id
+    ))
+
+    conn.commit()
+    conn.close()
+
+
+# ============================================================
+# STATUT DÉPÔT
+# ============================================================
+
+def is_deposit_verified(user_id):
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT deposit_verified
+        FROM users
+        WHERE id = ?
+    """, (user_id,))
+
+    result = cursor.fetchone()
+
+    conn.close()
+
+    return bool(result and result[0])
+
+
+def set_deposit_verified(
+    user_id,
+    verified=True
+):
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE users
+        SET deposit_verified = ?
+        WHERE id = ?
+    """, (
+        1 if verified else 0,
+        user_id
+    ))
+
+    conn.commit()
+    conn.close()
+
+
+# ============================================================
+# VÉRIFICATION COMPLÈTE
+# ============================================================
+
+def is_user_fully_verified(user_id):
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT
+            registration_verified,
+            deposit_verified
+        FROM users
+        WHERE id = ?
+    """, (user_id,))
+
+    result = cursor.fetchone()
+
+    conn.close()
+
+    if not result:
+        return False
+
+    registration_verified = bool(result[0])
+    deposit_verified = bool(result[1])
+
+    return (
+        registration_verified
+        and
+        deposit_verified
+    )
+
+
+# ============================================================
 # LANGUE
 # ============================================================
 
@@ -116,10 +257,11 @@ def get_language(user_id):
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute(
-        "SELECT language FROM users WHERE id = ?",
-        (user_id,)
-    )
+    cursor.execute("""
+        SELECT language
+        FROM users
+        WHERE id = ?
+    """, (user_id,))
 
     result = cursor.fetchone()
 
@@ -253,14 +395,12 @@ def get_statistics():
     conn = get_db()
     cursor = conn.cursor()
 
-    # Nombre total d'utilisateurs
     cursor.execute(
         "SELECT COUNT(*) FROM users"
     )
 
     users = cursor.fetchone()[0]
 
-    # Utilisateurs actifs durant les dernières 24 heures
     limit = (
         datetime.now() - timedelta(hours=24)
     ).strftime("%Y-%m-%d %H:%M:%S")
@@ -269,20 +409,16 @@ def get_statistics():
         SELECT COUNT(*)
         FROM users
         WHERE last_activity >= ?
-    """, (
-        limit,
-    ))
+    """, (limit,))
 
     active = cursor.fetchone()[0]
 
-    # Nombre total de prédictions
     cursor.execute(
         "SELECT COUNT(*) FROM predictions"
     )
 
     predictions = cursor.fetchone()[0]
 
-    # Statistiques par jeu
     cursor.execute("""
         SELECT game, COUNT(*)
         FROM predictions
@@ -291,7 +427,6 @@ def get_statistics():
 
     games = dict(cursor.fetchall())
 
-    # Statistiques par langue
     cursor.execute("""
         SELECT language, COUNT(*)
         FROM users
@@ -299,6 +434,31 @@ def get_statistics():
     """)
 
     languages = dict(cursor.fetchall())
+
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM users
+        WHERE registration_verified = 1
+    """)
+
+    verified_registrations = cursor.fetchone()[0]
+
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM users
+        WHERE deposit_verified = 1
+    """)
+
+    verified_deposits = cursor.fetchone()[0]
+
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM users
+        WHERE registration_verified = 1
+          AND deposit_verified = 1
+    """)
+
+    fully_verified = cursor.fetchone()[0]
 
     conn.close()
 
@@ -308,4 +468,7 @@ def get_statistics():
         "predictions": predictions,
         "games": games,
         "languages": languages,
-        }
+        "verified_registrations": verified_registrations,
+        "verified_deposits": verified_deposits,
+        "fully_verified": fully_verified,
+    }
