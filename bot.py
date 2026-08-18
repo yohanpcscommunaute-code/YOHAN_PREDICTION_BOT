@@ -1,28 +1,16 @@
 import os
-from datetime import datetime
 
 from telegram import (
     Update,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
-    ReplyKeyboardMarkup,
 )
+
 from telegram.ext import (
     Application,
     CommandHandler,
-    MessageHandler,
     CallbackQueryHandler,
     ContextTypes,
-    filters,
-)
-
-from config import (
-    TELEGRAM_TOKEN,
-    ADMIN_ID,
-    LUCKY_JET_COOLDOWN,
-    ROCKET_QUEEN_COOLDOWN,
-    LUCKY_JET_IMAGE,
-    ROCKET_QUEEN_IMAGE,
 )
 
 from database import (
@@ -30,282 +18,191 @@ from database import (
     register_user,
     get_language,
     set_language,
-    save_prediction,
-    get_statistics,
 )
 
-from predictions import generate_prediction
+from languages import (
+    TEXTS,
+    LANGUAGE_NAMES,
+)
 
-from languages import TEXTS
+from message_manager import (
+    send_clean_message,
+)
 
 
 # ============================================================
-# MENUS
+# CONFIGURATION
 # ============================================================
 
-def main_menu(lang):
-    if lang == "en":
-        keyboard = [
-            ["🎮 GAMES"],
-            ["🌐 LANGUAGE", "🆘 SUPPORT"],
-            ["ℹ️ HOW IT WORKS"],
-        ]
-    else:
-        keyboard = [
-            ["🎮 JEUX"],
-            ["🌐 LANGUE", "🆘 SUPPORT"],
-            ["ℹ️ COMMENT ÇA MARCHE"],
-        ]
-
-    return ReplyKeyboardMarkup(
-        keyboard,
-        resize_keyboard=True
-    )
+TOKEN = os.getenv("TELEGRAM_TOKEN")
 
 
-def games_menu(lang):
-    if lang == "en":
-        keyboard = [
-            ["✈️ LUCKY JET"],
-            ["🚀 ROCKET QUEEN"],
-            ["↩️ BACK"],
-        ]
-    else:
-        keyboard = [
-            ["✈️ LUCKY JET"],
-            ["🚀 ROCKET QUEEN"],
-            ["↩️ RETOUR"],
-        ]
+# ============================================================
+# OUTILS
+# ============================================================
 
-    return ReplyKeyboardMarkup(
-        keyboard,
-        resize_keyboard=True
-    )
+def get_text(user_id, key, **kwargs):
 
+    language = get_language(user_id)
 
-def language_menu():
-    keyboard = [
-        [
-            "🇫🇷 Français",
-            "🇬🇧 English",
-        ],
-        [
-            "↩️ Retour",
-        ],
-    ]
+    if language not in TEXTS:
+        language = "fr"
 
-    return ReplyKeyboardMarkup(
-        keyboard,
-        resize_keyboard=True
-    )
+    text = TEXTS[language].get(key, "")
+
+    if kwargs:
+        text = text.format(**kwargs)
+
+    return text
 
 
-def game_buttons(lang):
-    if lang == "en":
-        return InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton(
-                    "🔮 GENERATE PREDICTION",
-                    callback_data="generate",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    "🔄 NEXT ROUND",
-                    callback_data="next",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    "↩️ MAIN MENU",
-                    callback_data="main_menu",
-                )
-            ],
-        ])
+# ============================================================
+# BOUTON LANGUES
+# ============================================================
+
+def language_keyboard():
 
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton(
-                "🔮 GÉNÉRER UNE PRÉDICTION",
-                callback_data="generate",
+                "🇫🇷 Français",
+                callback_data="lang_fr"
+            ),
+            InlineKeyboardButton(
+                "🇬🇧 English",
+                callback_data="lang_en"
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                "🇪🇸 Español",
+                callback_data="lang_es"
+            ),
+            InlineKeyboardButton(
+                "🇻🇦 Latin",
+                callback_data="lang_la"
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                "🇸🇦 العربية",
+                callback_data="lang_ar"
+            ),
+            InlineKeyboardButton(
+                "🇵🇹 Português",
+                callback_data="lang_pt"
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                "🇨🇳 中文",
+                callback_data="lang_zh"
+            ),
+            InlineKeyboardButton(
+                "🇮🇳 हिन्दी",
+                callback_data="lang_hi"
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                "🇷🇺 Русский",
+                callback_data="lang_ru"
+            ),
+        ],
+    ])
+
+
+# ============================================================
+# MENU PRINCIPAL
+# ============================================================
+
+def main_menu_keyboard(language):
+
+    t = TEXTS[language]
+
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                "🎮 " + (
+                    "JEUX"
+                    if language == "fr"
+                    else "GAMES"
+                    if language == "en"
+                    else "JUEGOS"
+                ),
+                callback_data="games"
             )
         ],
         [
             InlineKeyboardButton(
-                "🔄 PROCHAIN TOUR",
-                callback_data="next",
+                "🌐 " + (
+                    "LANGUE"
+                    if language == "fr"
+                    else "LANGUAGE"
+                    if language == "en"
+                    else "IDIOMA"
+                ),
+                callback_data="language"
             )
         ],
         [
             InlineKeyboardButton(
-                "↩️ MENU PRINCIPAL",
-                callback_data="main_menu",
+                "🆘 " + t["support"].split("</b>")[0]
+                .replace("🆘 <b>", ""),
+                callback_data="support"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "ℹ️ " + (
+                    "COMMENT ÇA MARCHE"
+                    if language == "fr"
+                    else "HOW IT WORKS"
+                    if language == "en"
+                    else "CÓMO FUNCIONA"
+                ),
+                callback_data="how"
             )
         ],
     ])
 
 
 # ============================================================
-# CONFIGURATION DES JEUX
+# MENU DES JEUX
 # ============================================================
 
-GAMES = {
-    "luckyjet": {
-        "name": "LUCKY JET",
-        "image": LUCKY_JET_IMAGE,
-        "cooldown": LUCKY_JET_COOLDOWN,
-        "text": "lucky",
-    },
+def games_keyboard(language):
 
-    "rocketqueen": {
-        "name": "ROCKET QUEEN",
-        "image": ROCKET_QUEEN_IMAGE,
-        "cooldown": ROCKET_QUEEN_COOLDOWN,
-        "text": "rocket",
-    },
-}
+    if language == "fr":
+        back_text = "↩️ RETOUR"
 
+    elif language == "en":
+        back_text = "↩️ BACK"
 
-# ============================================================
-# COOLDOWN
-# ============================================================
+    elif language == "es":
+        back_text = "↩️ VOLVER"
 
-def get_remaining_cooldown(
-    context,
-    game,
-):
-    """
-    Chaque jeu possède sa propre minuterie.
+    else:
+        back_text = "↩️ BACK"
 
-    Lucky Jet :
-    last_signal_luckyjet
-
-    Rocket Queen :
-    last_signal_rocketqueen
-    """
-
-    key = f"last_signal_{game}"
-
-    last_signal = context.user_data.get(key)
-
-    if not last_signal:
-        return 0
-
-    cooldown = GAMES[game]["cooldown"]
-
-    elapsed = (
-        datetime.now() - last_signal
-    ).total_seconds()
-
-    remaining = cooldown - elapsed
-
-    if remaining <= 0:
-        return 0
-
-    return int(remaining)
-
-
-# ============================================================
-# AFFICHER LE JEU
-# ============================================================
-
-async def show_game(
-    update,
-    context,
-    game,
-):
-    user = update.effective_user
-
-    lang = get_language(user.id)
-
-    context.user_data["game"] = game
-
-    info = GAMES[game]
-
-    text = TEXTS[lang][info["text"]]
-
-    await update.message.reply_photo(
-        photo=info["image"],
-        caption=text,
-        parse_mode="HTML",
-        reply_markup=game_buttons(lang),
-    )
-
-
-# ============================================================
-# GÉNÉRER LA PRÉDICTION
-# ============================================================
-
-async def create_prediction(
-    message,
-    user_id,
-    context,
-):
-    game = context.user_data.get("game")
-
-    if game not in GAMES:
-        return
-
-    lang = get_language(user_id)
-
-    remaining = get_remaining_cooldown(
-        context,
-        game,
-    )
-
-    if remaining > 0:
-
-        minutes = remaining // 60
-        seconds = remaining % 60
-
-        await message.reply_text(
-            TEXTS[lang]["wait"].format(
-                minutes=minutes,
-                seconds=seconds,
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                "💥 CRASH",
+                callback_data="game_crash"
             ),
-            parse_mode="HTML",
-        )
-
-        return
-
-    result = generate_prediction()
-
-    signal_time = result["time"]
-    odds = result["odds"]
-    safe = result["safe"]
-
-    # --------------------------------------------------------
-    # IMPORTANT :
-    # Le cooldown est enregistré uniquement pour CE jeu.
-    # --------------------------------------------------------
-
-    context.user_data[
-        f"last_signal_{game}"
-    ] = datetime.now()
-
-    info = GAMES[game]
-
-    save_prediction(
-        user_id,
-        game,
-        odds,
-        safe,
-        signal_time,
-    )
-
-    text = TEXTS[lang]["prediction"].format(
-        time=signal_time,
-        odds=f"{odds:.2f}",
-        safe=f"{safe:.2f}",
-        game=info["name"],
-    )
-
-    await message.reply_photo(
-        photo=info["image"],
-        caption=text,
-        parse_mode="HTML",
-        reply_markup=game_buttons(lang),
-    )
+            InlineKeyboardButton(
+                "✈️ AVIATOR",
+                callback_data="game_aviator"
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                back_text,
+                callback_data="menu"
+            )
+        ],
+    ])
 
 
 # ============================================================
@@ -314,283 +211,299 @@ async def create_prediction(
 
 async def start(
     update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
+    context: ContextTypes.DEFAULT_TYPE
 ):
+
     user = update.effective_user
 
     register_user(user)
 
-    context.user_data.clear()
-
-    lang = get_language(user.id)
-
-    await update.message.reply_text(
-        TEXTS[lang]["welcome"],
-        parse_mode="HTML",
-        reply_markup=main_menu(lang),
+    text = get_text(
+        user.id,
+        "welcome"
     )
 
-
-# ============================================================
-# /HELP
-# ============================================================
-
-async def help_command(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-):
-    user = update.effective_user
-
-    register_user(user)
-
-    lang = get_language(user.id)
-
-    await update.message.reply_text(
-        TEXTS[lang]["how"],
-        parse_mode="HTML",
-        reply_markup=main_menu(lang),
-    )
-
-
-# ============================================================
-# ADMIN
-# ============================================================
-
-async def admin_command(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-):
-    user_id = update.effective_user.id
-
-    if ADMIN_ID == 0 or user_id != ADMIN_ID:
-        await update.message.reply_text(
-            "❌ Accès administrateur refusé."
-        )
-        return
-
-    stats = get_statistics()
-
-    text = TEXTS["fr"]["admin"].format(
-        users=stats["users"],
-        active=stats["active"],
-        predictions=stats["predictions"],
-        lucky=stats["lucky"],
-        rocket=stats["rocket"],
-        fr=stats["fr"],
-        en=stats["en"],
-    )
-
-    await update.message.reply_text(
+    await send_clean_message(
+        context,
+        update.effective_chat.id,
         text,
         parse_mode="HTML",
+        reply_markup=language_keyboard(),
     )
 
 
 # ============================================================
-# BOUTONS INLINE
+# CHOIX DE LANGUE
 # ============================================================
 
-async def callback_handler(
+async def language_callback(
     update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
+    context: ContextTypes.DEFAULT_TYPE
 ):
+
     query = update.callback_query
 
     await query.answer()
 
-    user = query.from_user
+    user_id = query.from_user.id
 
-    register_user(user)
+    language = query.data.replace(
+        "lang_",
+        ""
+    )
 
-    lang = get_language(user.id)
+    set_language(
+        user_id,
+        language
+    )
 
-    if query.data in [
-        "generate",
-        "next",
-    ]:
+    text = (
+        TEXTS[language]["language_selected"]
+        + "\n\n"
+        + TEXTS[language]["main_menu"]
+    )
 
-        await create_prediction(
-            query.message,
-            user.id,
-            context,
-        )
-
-        return
-
-    if query.data == "main_menu":
-
-        context.user_data.pop(
-            "game",
-            None,
-        )
-
-        await query.message.reply_text(
-            TEXTS[lang]["welcome"],
-            parse_mode="HTML",
-            reply_markup=main_menu(lang),
-        )
-
-        return
+    await send_clean_message(
+        context,
+        query.message.chat_id,
+        text,
+        parse_mode="HTML",
+        reply_markup=main_menu_keyboard(language),
+    )
 
 
 # ============================================================
-# MESSAGES
+# MENU PRINCIPAL
 # ============================================================
 
-async def message_handler(
+async def menu_callback(
     update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
+    context: ContextTypes.DEFAULT_TYPE
 ):
-    user = update.effective_user
 
-    register_user(user)
+    query = update.callback_query
 
-    lang = get_language(user.id)
+    await query.answer()
 
-    text = update.message.text
+    user_id = query.from_user.id
 
-    # --------------------------------------------------------
-    # JEUX
-    # --------------------------------------------------------
+    language = get_language(user_id)
 
-    if text in [
-        "🎮 JEUX",
-        "🎮 GAMES",
-    ]:
+    text = TEXTS[language]["main_menu"]
 
-        await update.message.reply_text(
-            TEXTS[lang]["games"],
-            parse_mode="HTML",
-            reply_markup=games_menu(lang),
-        )
+    await send_clean_message(
+        context,
+        query.message.chat_id,
+        text,
+        parse_mode="HTML",
+        reply_markup=main_menu_keyboard(language),
+    )
 
-        return
 
-    # --------------------------------------------------------
-    # LANGUE
-    # --------------------------------------------------------
+# ============================================================
+# JEUX
+# ============================================================
 
-    if text in [
-        "🌐 LANGUE",
-        "🌐 LANGUAGE",
-    ]:
+async def games_callback(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
 
-        await update.message.reply_text(
-            TEXTS[lang]["language"],
-            parse_mode="HTML",
-            reply_markup=language_menu(),
-        )
+    query = update.callback_query
 
-        return
+    await query.answer()
 
-    # --------------------------------------------------------
-    # SUPPORT
-    # --------------------------------------------------------
+    user_id = query.from_user.id
 
-    if text == "🆘 SUPPORT":
+    language = get_language(user_id)
 
-        await update.message.reply_text(
-            TEXTS[lang]["support"],
-            parse_mode="HTML",
-            reply_markup=main_menu(lang),
-        )
+    text = TEXTS[language]["games"]
 
-        return
+    await send_clean_message(
+        context,
+        query.message.chat_id,
+        text,
+        parse_mode="HTML",
+        reply_markup=games_keyboard(language),
+    )
 
-    # --------------------------------------------------------
-    # COMMENT ÇA MARCHE
-    # --------------------------------------------------------
 
-    if text in [
-        "ℹ️ COMMENT ÇA MARCHE",
-        "ℹ️ HOW IT WORKS",
-    ]:
+# ============================================================
+# CRASH
+# ============================================================
 
-        await update.message.reply_text(
-            TEXTS[lang]["how"],
-            parse_mode="HTML",
-            reply_markup=main_menu(lang),
-        )
+async def crash_callback(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
 
-        return
+    query = update.callback_query
 
-    # --------------------------------------------------------
-    # CHANGEMENT DE LANGUE
-    # --------------------------------------------------------
+    await query.answer()
 
-    if text == "🇫🇷 Français":
+    user_id = query.from_user.id
 
-        set_language(
-            user.id,
-            "fr",
-        )
+    language = get_language(user_id)
 
-        await update.message.reply_text(
-            TEXTS["fr"]["language_changed"],
-            reply_markup=main_menu("fr"),
-        )
+    text = TEXTS[language]["crash"]
 
-        return
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                TEXTS[language]["generate"],
+                callback_data="generate_crash"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                TEXTS[language]["back"],
+                callback_data="games"
+            )
+        ],
+    ])
 
-    if text == "🇬🇧 English":
+    await send_clean_message(
+        context,
+        query.message.chat_id,
+        text,
+        parse_mode="HTML",
+        reply_markup=keyboard,
+    )
 
-        set_language(
-            user.id,
-            "en",
-        )
 
-        await update.message.reply_text(
-            TEXTS["en"]["language_changed"],
-            reply_markup=main_menu("en"),
-        )
+# ============================================================
+# AVIATOR
+# ============================================================
 
-        return
+async def aviator_callback(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
 
-    # --------------------------------------------------------
-    # LUCKY JET
-    # --------------------------------------------------------
+    query = update.callback_query
 
-    if text == "✈️ LUCKY JET":
+    await query.answer()
 
-        await show_game(
-            update,
-            context,
-            "luckyjet",
-        )
+    user_id = query.from_user.id
 
-        return
+    language = get_language(user_id)
 
-    # --------------------------------------------------------
-    # ROCKET QUEEN
-    # --------------------------------------------------------
+    text = TEXTS[language]["aviator"]
 
-    if text == "🚀 ROCKET QUEEN":
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                TEXTS[language]["generate"],
+                callback_data="generate_aviator"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                TEXTS[language]["back"],
+                callback_data="games"
+            )
+        ],
+    ])
 
-        await show_game(
-            update,
-            context,
-            "rocketqueen",
-        )
+    await send_clean_message(
+        context,
+        query.message.chat_id,
+        text,
+        parse_mode="HTML",
+        reply_markup=keyboard,
+    )
 
-        return
 
-    # --------------------------------------------------------
-    # RETOUR
-    # --------------------------------------------------------
+# ============================================================
+# LANGUE
+# ============================================================
 
-    if text in [
-        "↩️ RETOUR",
-        "↩️ BACK",
-        "↩️ Retour",
-    ]:
+async def language_menu_callback(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
 
-        await update.message.reply_text(
-            TEXTS[lang]["welcome"],
-            parse_mode="HTML",
-            reply_markup=main_menu(lang),
-        )
+    query = update.callback_query
 
-        return
+    await query.answer()
+
+    await send_clean_message(
+        context,
+        query.message.chat_id,
+        "🌐 <b>LANGUAGE / LANGUE</b>",
+        parse_mode="HTML",
+        reply_markup=language_keyboard(),
+    )
+
+
+# ============================================================
+# SUPPORT
+# ============================================================
+
+async def support_callback(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    query = update.callback_query
+
+    await query.answer()
+
+    user_id = query.from_user.id
+
+    language = get_language(user_id)
+
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                TEXTS[language]["menu"],
+                callback_data="menu"
+            )
+        ]
+    ])
+
+    await send_clean_message(
+        context,
+        query.message.chat_id,
+        TEXTS[language]["support"],
+        parse_mode="HTML",
+        reply_markup=keyboard,
+    )
+
+
+# ============================================================
+# COMMENT ÇA MARCHE
+# ============================================================
+
+async def how_callback(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    query = update.callback_query
+
+    await query.answer()
+
+    user_id = query.from_user.id
+
+    language = get_language(user_id)
+
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                TEXTS[language]["menu"],
+                callback_data="menu"
+            )
+        ]
+    ])
+
+    await send_clean_message(
+        context,
+        query.message.chat_id,
+        TEXTS[language]["how"],
+        parse_mode="HTML",
+        reply_markup=keyboard,
+    )
 
 
 # ============================================================
@@ -599,53 +512,90 @@ async def message_handler(
 
 def main():
 
-    if not TELEGRAM_TOKEN:
+    if not TOKEN:
+
         raise ValueError(
-            "TELEGRAM_TOKEN est introuvable."
+            "TELEGRAM_TOKEN est introuvable. "
+            "Ajoute le secret TELEGRAM_TOKEN."
         )
 
     init_database()
 
     app = (
         Application.builder()
-        .token(TELEGRAM_TOKEN)
+        .token(TOKEN)
         .build()
     )
 
-    # Commandes
+    # /start
     app.add_handler(
         CommandHandler(
             "start",
-            start,
+            start
         )
     )
 
-    app.add_handler(
-        CommandHandler(
-            "help",
-            help_command,
-        )
-    )
-
-    app.add_handler(
-        CommandHandler(
-            "admin",
-            admin_command,
-        )
-    )
-
-    # Boutons inline
+    # Langues
     app.add_handler(
         CallbackQueryHandler(
-            callback_handler,
+            language_callback,
+            pattern=r"^lang_"
         )
     )
 
-    # Menu classique
+    # Menu
     app.add_handler(
-        MessageHandler(
-            filters.TEXT & ~filters.COMMAND,
-            message_handler,
+        CallbackQueryHandler(
+            menu_callback,
+            pattern=r"^menu$"
+        )
+    )
+
+    # Jeux
+    app.add_handler(
+        CallbackQueryHandler(
+            games_callback,
+            pattern=r"^games$"
+        )
+    )
+
+    # Crash
+    app.add_handler(
+        CallbackQueryHandler(
+            crash_callback,
+            pattern=r"^game_crash$"
+        )
+    )
+
+    # Aviator
+    app.add_handler(
+        CallbackQueryHandler(
+            aviator_callback,
+            pattern=r"^game_aviator$"
+        )
+    )
+
+    # Langue
+    app.add_handler(
+        CallbackQueryHandler(
+            language_menu_callback,
+            pattern=r"^language$"
+        )
+    )
+
+    # Support
+    app.add_handler(
+        CallbackQueryHandler(
+            support_callback,
+            pattern=r"^support$"
+        )
+    )
+
+    # Comment ça marche
+    app.add_handler(
+        CallbackQueryHandler(
+            how_callback,
+            pattern=r"^how$"
         )
     )
 
