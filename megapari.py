@@ -104,4 +104,3 @@ def megapari_keyboard(language="fr"):
             )
         ],
     ])
-
