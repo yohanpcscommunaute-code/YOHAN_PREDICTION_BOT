@@ -275,3 +275,35 @@ def can_access_signals(telegram_id):
         and float(user["deposit_amount"] or 0) >= 5000
         and bool(user["signals_unlocked"])
         )
+def get_language(telegram_id):
+    user = get_user(telegram_id)
+
+    if not user:
+        return "fr"
+
+    try:
+        return user["language"] or "fr"
+    except (KeyError, IndexError):
+        return "fr"
+
+
+def set_language(telegram_id, language):
+    allowed = {
+        "fr",
+        "en",
+        "es",
+        "pt",
+        "ru",
+        "ar",
+        "zh",
+        "hi",
+        "la",
+    }
+
+    if language not in allowed:
+        language = "fr"
+
+    update_user(
+        telegram_id,
+        language=language
+        )
