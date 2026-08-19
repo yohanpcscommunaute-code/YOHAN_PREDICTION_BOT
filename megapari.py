@@ -39,52 +39,69 @@ def megapari_message(language="fr"):
         "🔐 L'accès sera débloqué uniquement après "
         "confirmation des vérifications."
     )
-
-
 def megapari_keyboard(language="fr"):
 
-    if language == "en":
-        register_text = "📝 REGISTER ON MEGAPARI"
-        deposit_text = "💰 MAKE DEPOSIT"
-        verify_register_text = "✅ VERIFY REGISTRATION"
-        verify_deposit_text = "💳 VERIFY DEPOSIT"
-        back_text = "↩️ BACK"
-    else:
-        register_text = "📝 S'INSCRIRE SUR MEGAPARI"
-        deposit_text = "💰 EFFECTUER LE DÉPÔT"
-        verify_register_text = "✅ VÉRIFIER L'INSCRIPTION"
-        verify_deposit_text = "💳 VÉRIFIER LE DÉPÔT"
-        back_text = "↩️ RETOUR"
+    labels = {
+        "fr": {
+            "register": "📝 S'INSCRIRE SUR MEGAPARI",
+            "deposit": "💰 EFFECTUER LE DÉPÔT",
+            "verify_registration": "✅ VÉRIFIER L'INSCRIPTION",
+            "verify_deposit": "🔎 VÉRIFIER LE DÉPÔT",
+            "back": "↩️ RETOUR",
+        },
+
+        "en": {
+            "register": "📝 REGISTER ON MEGAPARI",
+            "deposit": "💰 MAKE DEPOSIT",
+            "verify_registration": "✅ VERIFY REGISTRATION",
+            "verify_deposit": "🔎 VERIFY DEPOSIT",
+            "back": "↩️ BACK",
+        },
+    }
+
+    lang = labels.get(language, labels["fr"])
 
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton(
-                text=register_text,
-                url=MEGAPARI_REGISTER_URL,
+                lang["register"],
+                url=MEGAPARI_REGISTER_URL
             )
         ],
+
         [
             InlineKeyboardButton(
-                text=deposit_text,
-                url=MEGAPARI_REGISTER_URL,
+                "💰 DÉPÔT — MIXX BY YAS",
+                callback_data="deposit_mixx"
             )
         ],
+
         [
             InlineKeyboardButton(
-                text=verify_register_text,
-                callback_data="verify_registration",
+                "💰 DÉPÔT — MOOV MONEY",
+                callback_data="deposit_moov"
             )
         ],
+
         [
             InlineKeyboardButton(
-                text=verify_deposit_text,
-                callback_data="verify_deposit",
+                lang["verify_registration"],
+                callback_data="verify_megapari"
             )
         ],
+
         [
             InlineKeyboardButton(
-                text=back_text,
-                callback_data="menu",
+                lang["verify_deposit"],
+                callback_data="verify_deposit"
+            )
+        ],
+
+        [
+            InlineKeyboardButton(
+                lang["back"],
+                callback_data="menu"
             )
         ],
     ])
+
