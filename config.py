@@ -10,13 +10,13 @@ if not BOT_TOKEN:
 
 # MEGAPARI
 MEGAPARI_REGISTER_URL = os.getenv(
-    "https://3773080.megapari-104631.in/",
-    ""
+    "MEGAPARI_REGISTER_URL",
+    "https://3773080.megapari-104631.in/"
 )
 
 MEGAPARI_PROMO_CODE = os.getenv(
     "MEGAPARI_PROMO_CODE",
-    ""
+    "SB55"
 )
 
 MEGAPARI_MIN_DEPOSIT = float(
