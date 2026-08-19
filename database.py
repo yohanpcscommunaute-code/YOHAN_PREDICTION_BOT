@@ -1,64 +1,32 @@
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime
 
-DATABASE = "yohan_prediction.db"
-
-
-# ============================================================
-# CONNEXION
-# ============================================================
-
-def get_db():
-    return sqlite3.connect(DATABASE)
+DB_NAME = "yohan_bot.db"
 
 
-# ============================================================
-# INITIALISATION
-# ============================================================
+def get_connection():
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    return conn
 
-def init_database():
-    conn = get_db()
-    cursor = conn.cursor()
 
-    cursor.execute("""
+def init_db():
+    conn = get_connection()
+
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY,
-            name TEXT,
-            username TEXT,
-            language TEXT DEFAULT 'fr',
-            predictions INTEGER DEFAULT 0,
-            last_activity TEXT,
-            created_at TEXT,
-            registration_verified INTEGER DEFAULT 0,
-            deposit_verified INTEGER DEFAULT 0
-        )
-    """)
-
-    # Migration des anciennes bases
-    cursor.execute("PRAGMA table_info(users)")
-    columns = [row[1] for row in cursor.fetchall()]
-
-    if "registration_verified" not in columns:
-        cursor.execute("""
-            ALTER TABLE users
-            ADD COLUMN registration_verified INTEGER DEFAULT 0
-        """)
-
-    if "deposit_verified" not in columns:
-        cursor.execute("""
-            ALTER TABLE users
-            ADD COLUMN deposit_verified INTEGER DEFAULT 0
-        """)
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS predictions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            game TEXT,
-            odds REAL,
-            safe REAL,
-            signal_time TEXT,
-            created_at TEXT
+            telegram_id INTEGER UNIQUE NOT NULL,
+            username TEXT,
+            first_name TEXT,
+            registered INTEGER DEFAULT 0,
+            one_win_user_id TEXT,
+            deposit_amount REAL DEFAULT 0,
+            deposit_verified INTEGER DEFAULT 0,
+            signals_unlocked INTEGER DEFAULT 0,
+            notifications INTEGER DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
         )
     """)
 
@@ -66,319 +34,37 @@ def init_database():
     conn.close()
 
 
-# ============================================================
-# UTILISATEUR
-# ============================================================
+def get_user(telegram_id):
+    conn = get_connection()
 
-def register_user(user):
-
-    conn = get_db()
-    cursor = conn.cursor()
-
-    now = datetime.now().strftime(
-        "%Y-%m-%d %H:%M:%S"
-    )
-
-    cursor.execute(
-        "SELECT id FROM users WHERE id = ?",
-        (user.id,)
-    )
-
-    exists = cursor.fetchone()
-
-    if exists:
-
-        cursor.execute("""
-            UPDATE users
-            SET name = ?,
-                username = ?,
-                last_activity = ?
-            WHERE id = ?
-        """, (
-            user.first_name,
-            user.username or "",
-            now,
-            user.id
-        ))
-
-    else:
-
-        cursor.execute("""
-            INSERT INTO users (
-                id,
-                name,
-                username,
-                language,
-                predictions,
-                last_activity,
-                created_at,
-                registration_verified,
-                deposit_verified
-            )
-            VALUES (?, ?, ?, 'fr', 0, ?, ?, 0, 0)
-        """, (
-            user.id,
-            user.first_name,
-            user.username or "",
-            now,
-            now
-        ))
-
-    conn.commit()
-    conn.close()
-
-
-# ============================================================
-# STATUT INSCRIPTION
-# ============================================================
-
-def is_registration_verified(user_id):
-
-    conn = get_db()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT registration_verified
-        FROM users
-        WHERE id = ?
-    """, (user_id,))
-
-    result = cursor.fetchone()
+    user = conn.execute(
+        "SELECT * FROM users WHERE telegram_id = ?",
+        (telegram_id,)
+    ).fetchone()
 
     conn.close()
-
-    return bool(result and result[0])
-
-
-def set_registration_verified(
-    user_id,
-    verified=True
-):
-
-    conn = get_db()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        UPDATE users
-        SET registration_verified = ?
-        WHERE id = ?
-    """, (
-        1 if verified else 0,
-        user_id
-    ))
-
-    conn.commit()
-    conn.close()
+    return user
 
 
-# ============================================================
-# STATUT DÉPÔT
-# ============================================================
+def create_user(telegram_id, username=None, first_name=None):
+    now = datetime.utcnow().isoformat()
 
-def is_deposit_verified(user_id):
+    conn = get_connection()
 
-    conn = get_db()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT deposit_verified
-        FROM users
-        WHERE id = ?
-    """, (user_id,))
-
-    result = cursor.fetchone()
-
-    conn.close()
-
-    return bool(result and result[0])
-
-
-def set_deposit_verified(
-    user_id,
-    verified=True
-):
-
-    conn = get_db()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        UPDATE users
-        SET deposit_verified = ?
-        WHERE id = ?
-    """, (
-        1 if verified else 0,
-        user_id
-    ))
-
-    conn.commit()
-    conn.close()
-
-
-# ============================================================
-# VÉRIFICATION COMPLÈTE
-# ============================================================
-
-def is_user_fully_verified(user_id):
-
-    conn = get_db()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT
-            registration_verified,
-            deposit_verified
-        FROM users
-        WHERE id = ?
-    """, (user_id,))
-
-    result = cursor.fetchone()
-
-    conn.close()
-
-    if not result:
-        return False
-
-    registration_verified = bool(result[0])
-    deposit_verified = bool(result[1])
-
-    return (
-        registration_verified
-        and
-        deposit_verified
-    )
-
-
-# ============================================================
-# LANGUE
-# ============================================================
-
-def get_language(user_id):
-
-    conn = get_db()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT language
-        FROM users
-        WHERE id = ?
-    """, (user_id,))
-
-    result = cursor.fetchone()
-
-    conn.close()
-
-    if result and result[0]:
-        return result[0]
-
-    return "fr"
-
-
-def set_language(user_id, language):
-
-    allowed_languages = [
-        "fr",
-        "en",
-        "es",
-        "la",
-        "ar",
-        "pt",
-        "zh",
-        "hi",
-        "ru",
-    ]
-
-    if language not in allowed_languages:
-        return False
-
-    conn = get_db()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        UPDATE users
-        SET language = ?
-        WHERE id = ?
-    """, (
-        language,
-        user_id
-    ))
-
-    conn.commit()
-    conn.close()
-
-    return True
-
-
-# ============================================================
-# ACTIVITÉ
-# ============================================================
-
-def update_activity(user_id):
-
-    conn = get_db()
-    cursor = conn.cursor()
-
-    now = datetime.now().strftime(
-        "%Y-%m-%d %H:%M:%S"
-    )
-
-    cursor.execute("""
-        UPDATE users
-        SET last_activity = ?
-        WHERE id = ?
-    """, (
-        now,
-        user_id
-    ))
-
-    conn.commit()
-    conn.close()
-
-
-# ============================================================
-# PRÉDICTIONS
-# ============================================================
-
-def save_prediction(
-    user_id,
-    game,
-    odds,
-    safe,
-    signal_time
-):
-
-    conn = get_db()
-    cursor = conn.cursor()
-
-    now = datetime.now().strftime(
-        "%Y-%m-%d %H:%M:%S"
-    )
-
-    cursor.execute("""
-        UPDATE users
-        SET predictions = predictions + 1,
-            last_activity = ?
-        WHERE id = ?
-    """, (
-        now,
-        user_id
-    ))
-
-    cursor.execute("""
-        INSERT INTO predictions (
-            user_id,
-            game,
-            odds,
-            safe,
-            signal_time,
-            created_at
+    conn.execute("""
+        INSERT OR IGNORE INTO users (
+            telegram_id,
+            username,
+            first_name,
+            created_at,
+            updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?)
     """, (
-        user_id,
-        game,
-        odds,
-        safe,
-        signal_time,
+        telegram_id,
+        username,
+        first_name,
+        now,
         now
     ))
 
@@ -386,89 +72,77 @@ def save_prediction(
     conn.close()
 
 
-# ============================================================
-# STATISTIQUES
-# ============================================================
+def update_user(telegram_id, **fields):
+    if not fields:
+        return
 
-def get_statistics():
+    fields["updated_at"] = datetime.utcnow().isoformat()
 
-    conn = get_db()
-    cursor = conn.cursor()
+    allowed = {
+        "username",
+        "first_name",
+        "registered",
+        "one_win_user_id",
+        "deposit_amount",
+        "deposit_verified",
+        "signals_unlocked",
+        "notifications",
+        "updated_at",
+    }
 
-    cursor.execute(
-        "SELECT COUNT(*) FROM users"
+    fields = {
+        key: value
+        for key, value in fields.items()
+        if key in allowed
+    }
+
+    if not fields:
+        return
+
+    columns = ", ".join(f"{key} = ?" for key in fields)
+    values = list(fields.values())
+    values.append(telegram_id)
+
+    conn = get_connection()
+
+    conn.execute(
+        f"""
+        UPDATE users
+        SET {columns}
+        WHERE telegram_id = ?
+        """,
+        values
     )
 
-    users = cursor.fetchone()[0]
-
-    limit = (
-        datetime.now() - timedelta(hours=24)
-    ).strftime("%Y-%m-%d %H:%M:%S")
-
-    cursor.execute("""
-        SELECT COUNT(*)
-        FROM users
-        WHERE last_activity >= ?
-    """, (limit,))
-
-    active = cursor.fetchone()[0]
-
-    cursor.execute(
-        "SELECT COUNT(*) FROM predictions"
-    )
-
-    predictions = cursor.fetchone()[0]
-
-    cursor.execute("""
-        SELECT game, COUNT(*)
-        FROM predictions
-        GROUP BY game
-    """)
-
-    games = dict(cursor.fetchall())
-
-    cursor.execute("""
-        SELECT language, COUNT(*)
-        FROM users
-        GROUP BY language
-    """)
-
-    languages = dict(cursor.fetchall())
-
-    cursor.execute("""
-        SELECT COUNT(*)
-        FROM users
-        WHERE registration_verified = 1
-    """)
-
-    verified_registrations = cursor.fetchone()[0]
-
-    cursor.execute("""
-        SELECT COUNT(*)
-        FROM users
-        WHERE deposit_verified = 1
-    """)
-
-    verified_deposits = cursor.fetchone()[0]
-
-    cursor.execute("""
-        SELECT COUNT(*)
-        FROM users
-        WHERE registration_verified = 1
-          AND deposit_verified = 1
-    """)
-
-    fully_verified = cursor.fetchone()[0]
-
+    conn.commit()
     conn.close()
 
-    return {
-        "users": users,
-        "active": active,
-        "predictions": predictions,
-        "games": games,
-        "languages": languages,
-        "verified_registrations": verified_registrations,
-        "verified_deposits": verified_deposits,
-        "fully_verified": fully_verified,
-    }
+
+def set_deposit(telegram_id, amount, verified=False):
+    amount = float(amount)
+
+    unlocked = (
+        verified
+        and amount >= 25.00
+    )
+
+    update_user(
+        telegram_id,
+        deposit_amount=amount,
+        deposit_verified=int(verified),
+        signals_unlocked=int(unlocked)
+    )
+
+
+def can_access_signals(telegram_id):
+    user = get_user(telegram_id)
+
+    if not user:
+        return False
+
+    return (
+        bool(user["registered"])
+        and bool(user["deposit_verified"])
+        and float(user["deposit_amount"] or 0) >= 25.00
+        and bool(user["signals_unlocked"])
+    )
