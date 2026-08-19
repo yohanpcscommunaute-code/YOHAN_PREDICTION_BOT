@@ -30,7 +30,7 @@ from megapari import (
 
 from handlers.menu import main_menu_keyboard
 from handlers.games import register_game_handlers
-
+from handlers.payments import register_payment_handlers
 
 # ============================================================
 # CONFIGURATION
