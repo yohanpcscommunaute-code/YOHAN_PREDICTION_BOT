@@ -3,10 +3,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
 
 if not BOT_TOKEN:
-    raise RuntimeError("BOT_TOKEN n'est pas configuré.")
+    raise RuntimeError("TELEGRAM_TOKEN n'est pas configuré.")
 
 MIN_DEPOSIT = 25.00
 
