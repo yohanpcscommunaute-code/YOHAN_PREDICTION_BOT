@@ -1,13 +1,25 @@
 import os
-from dotenv import load_dotenv
-
-load_dotenv()
 
 BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
 
 if not BOT_TOKEN:
-    raise RuntimeError("TELEGRAM_TOKEN n'est pas configuré.")
+    raise RuntimeError(
+        "TELEGRAM_TOKEN n'est pas configuré."
+    )
 
-MIN_DEPOSIT = 25.00
+MEGAPARI_REGISTER_URL = os.getenv(
+    "https://3773080.megapari-104631.in/",
+    ""
+)
 
-BOT_NAME = "YOHAN PREDICTION BOT"
+MEGAPARI_PROMO_CODE = os.getenv(
+    "MEGAPARI_PROMO_CODE",
+    ""
+)
+
+MEGAPARI_MIN_DEPOSIT = float(
+    os.getenv(
+        "MEGAPARI_MIN_DEPOSIT",
+        "25"
+    )
+)
