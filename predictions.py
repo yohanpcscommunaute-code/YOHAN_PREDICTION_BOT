@@ -1,5 +1,5 @@
-import random
 from datetime import datetime, timedelta
+from random import uniform, randint
 
 from config import (
     TIME_MINUTES_MIN,
@@ -13,36 +13,42 @@ from config import (
 
 def generate_prediction():
     """
-    Génère une prédiction simulée.
+    Génère une prédiction YOHAN PREDICTION.
 
-    Le résultat est aléatoire et ne représente
-    pas une prédiction réelle du résultat d'un jeu.
+    Les paramètres sont contrôlés depuis config.py.
     """
 
-    random_minutes = random.randint(
+    minutes = randint(
         TIME_MINUTES_MIN,
         TIME_MINUTES_MAX
     )
 
-    signal_date = (
-        datetime.now()
-        + timedelta(minutes=random_minutes)
+    prediction_time = datetime.now() + timedelta(
+        minutes=minutes
     )
 
-    signal_time = signal_date.strftime("%H:%M")
+    odds = round(
+        uniform(ODDS_MIN, ODDS_MAX),
+        2
+    )
 
-    odds = random.randint(
-        int(ODDS_MIN * 100),
-        int(ODDS_MAX * 100)
-    ) / 100
-
-    safe = random.randint(
-        int(SAFE_MIN * 100),
-        int(SAFE_MAX * 100)
-    ) / 100
+    safe = randint(
+        SAFE_MIN,
+        SAFE_MAX
+    )
 
     return {
-        "time": signal_time,
+        "time": prediction_time.strftime("%H:%M"),
         "odds": odds,
         "safe": safe,
-  }
+    }
+
+
+def format_prediction(result):
+    return (
+        "🎯 <b>YOHAN PREDICTION</b>\n\n"
+        f"⏰ Heure : <b>{result['time']}</b>\n"
+        f"📈 Cote : <b>{result['odds']}x</b>\n"
+        f"🛡️ Sécurité : <b>{result['safe']}%</b>\n\n"
+        "⚠️ Signal indicatif — aucun résultat n'est garanti."
+    )
