@@ -180,11 +180,20 @@ async def start(
     if not db_user:
 
         await clean_send(
-            context,
-            update.effective_chat.id,
-            megapari_message("fr"),
-            megapari_keyboard("fr")
-        )
+    context,
+    update.effective_chat.id,
+    "🤖 <b>YOHAN PREDICTION BOT</b>\n\n"
+    "Le bot fonctionne correctement.\n"
+    "Configuration de l'accès en cours.",
+    InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                text="📝 TEST",
+                callback_data="test_button"
+            )
+        ]
+    ])
+)
 
         return
 
