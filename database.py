@@ -1,8 +1,14 @@
 import sqlite3
 from datetime import datetime
 
-DB_NAME = "yohan_bot.db"
 
+DB_NAME = "yohan_bot.db"
+MIN_DEPOSIT = 25.00
+
+
+# ============================================================
+# CONNEXION
+# ============================================================
 
 def get_connection():
     conn = sqlite3.connect(DB_NAME)
@@ -10,7 +16,11 @@ def get_connection():
     return conn
 
 
-def init_db():
+# ============================================================
+# INITIALISATION
+# ============================================================
+
+def init_database():
     conn = get_connection()
 
     conn.execute("""
@@ -19,12 +29,19 @@ def init_db():
             telegram_id INTEGER UNIQUE NOT NULL,
             username TEXT,
             first_name TEXT,
+
+            language TEXT DEFAULT 'fr',
+
             registered INTEGER DEFAULT 0,
             one_win_user_id TEXT,
+
             deposit_amount REAL DEFAULT 0,
             deposit_verified INTEGER DEFAULT 0,
+
             signals_unlocked INTEGER DEFAULT 0,
+
             notifications INTEGER DEFAULT 1,
+
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         )
@@ -34,53 +51,142 @@ def init_db():
     conn.close()
 
 
+# Compatibilité avec l'ancien nom
+def init_db():
+    init_database()
+
+
+# ============================================================
+# UTILISATEUR
+# ============================================================
+
 def get_user(telegram_id):
     conn = get_connection()
 
     user = conn.execute(
-        "SELECT * FROM users WHERE telegram_id = ?",
+        """
+        SELECT *
+        FROM users
+        WHERE telegram_id = ?
+        """,
         (telegram_id,)
     ).fetchone()
 
     conn.close()
+
     return user
 
 
-def create_user(telegram_id, username=None, first_name=None):
+def register_user(user):
     now = datetime.utcnow().isoformat()
 
     conn = get_connection()
 
-    conn.execute("""
-        INSERT OR IGNORE INTO users (
-            telegram_id,
-            username,
-            first_name,
-            created_at,
-            updated_at
+    existing = conn.execute(
+        """
+        SELECT id
+        FROM users
+        WHERE telegram_id = ?
+        """,
+        (user.id,)
+    ).fetchone()
+
+    if existing:
+
+        conn.execute(
+            """
+            UPDATE users
+            SET username = ?,
+                first_name = ?,
+                updated_at = ?
+            WHERE telegram_id = ?
+            """,
+            (
+                user.username,
+                user.first_name,
+                now,
+                user.id
+            )
         )
-        VALUES (?, ?, ?, ?, ?)
-    """, (
-        telegram_id,
-        username,
-        first_name,
-        now,
-        now
-    ))
+
+    else:
+
+        conn.execute(
+            """
+            INSERT INTO users (
+                telegram_id,
+                username,
+                first_name,
+                language,
+                created_at,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                user.id,
+                user.username,
+                user.first_name,
+                "fr",
+                now,
+                now
+            )
+        )
 
     conn.commit()
     conn.close()
 
 
+# Compatibilité avec l'ancien système
+def create_user(
+    telegram_id,
+    username=None,
+    first_name=None
+):
+
+    now = datetime.utcnow().isoformat()
+
+    conn = get_connection()
+
+    conn.execute(
+        """
+        INSERT OR IGNORE INTO users (
+            telegram_id,
+            username,
+            first_name,
+            language,
+            created_at,
+            updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            telegram_id,
+            username,
+            first_name,
+            "fr",
+            now,
+            now
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+
+# ============================================================
+# MISE À JOUR
+# ============================================================
+
 def update_user(telegram_id, **fields):
+
     if not fields:
         return
-
-    fields["updated_at"] = datetime.utcnow().isoformat()
 
     allowed = {
         "username",
         "first_name",
+        "language",
         "registered",
         "one_win_user_id",
         "deposit_amount",
@@ -99,7 +205,13 @@ def update_user(telegram_id, **fields):
     if not fields:
         return
 
-    columns = ", ".join(f"{key} = ?" for key in fields)
+    fields["updated_at"] = datetime.utcnow().isoformat()
+
+    columns = ", ".join(
+        f"{key} = ?"
+        for key in fields
+    )
+
     values = list(fields.values())
     values.append(telegram_id)
 
@@ -118,31 +230,189 @@ def update_user(telegram_id, **fields):
     conn.close()
 
 
-def set_deposit(telegram_id, amount, verified=False):
-    amount = float(amount)
+# ============================================================
+# LANGUE
+# ============================================================
 
-    unlocked = (
-        verified
-        and amount >= 25.00
-    )
+def get_language(telegram_id):
+
+    user = get_user(telegram_id)
+
+    if not user:
+        return "fr"
+
+    return user["language"] or "fr"
+
+
+def set_language(
+    telegram_id,
+    language
+):
+
+    allowed_languages = {
+        "fr",
+        "en",
+        "es",
+        "la",
+        "ar",
+        "pt",
+        "zh",
+        "hi",
+        "ru",
+    }
+
+    if language not in allowed_languages:
+        language = "fr"
 
     update_user(
         telegram_id,
-        deposit_amount=amount,
-        deposit_verified=int(verified),
-        signals_unlocked=int(unlocked)
+        language=language
     )
 
 
-def can_access_signals(telegram_id):
+# ============================================================
+# INSCRIPTION
+# ============================================================
+
+def set_registration_verified(
+    telegram_id,
+    verified=True,
+    one_win_user_id=None
+):
+
+    fields = {
+        "registered": int(bool(verified))
+    }
+
+    if one_win_user_id is not None:
+        fields["one_win_user_id"] = str(
+            one_win_user_id
+        )
+
+    update_user(
+        telegram_id,
+        **fields
+    )
+
+    refresh_signal_access(
+        telegram_id
+    )
+
+
+def is_registration_verified(
+    telegram_id
+):
+
     user = get_user(telegram_id)
 
     if not user:
         return False
 
-    return (
+    return bool(
+        user["registered"]
+    )
+
+
+# ============================================================
+# DÉPÔT
+# ============================================================
+
+def set_deposit(
+    telegram_id,
+    amount,
+    verified=False
+):
+
+    amount = float(amount)
+
+    update_user(
+        telegram_id,
+        deposit_amount=amount,
+        deposit_verified=int(
+            bool(verified)
+        )
+    )
+
+    refresh_signal_access(
+        telegram_id
+    )
+
+
+def is_deposit_verified(
+    telegram_id
+):
+
+    user = get_user(telegram_id)
+
+    if not user:
+        return False
+
+    return bool(
+        user["deposit_verified"]
+    )
+
+
+# ============================================================
+# ACCÈS AUX SIGNAUX
+# ============================================================
+
+def refresh_signal_access(
+    telegram_id
+):
+
+    user = get_user(telegram_id)
+
+    if not user:
+        return False
+
+    unlocked = (
         bool(user["registered"])
         and bool(user["deposit_verified"])
-        and float(user["deposit_amount"] or 0) >= 25.00
-        and bool(user["signals_unlocked"])
+        and float(
+            user["deposit_amount"] or 0
+        ) >= MIN_DEPOSIT
+    )
+
+    update_user(
+        telegram_id,
+        signals_unlocked=int(unlocked)
+    )
+
+    return unlocked
+
+
+def is_user_fully_verified(
+    telegram_id
+):
+
+    user = get_user(telegram_id)
+
+    if not user:
+        return False
+
+    unlocked = (
+        bool(user["registered"])
+        and bool(user["deposit_verified"])
+        and float(
+            user["deposit_amount"] or 0
+        ) >= MIN_DEPOSIT
+    )
+
+    # On resynchronise toujours le statut.
+    if bool(user["signals_unlocked"]) != unlocked:
+
+        update_user(
+            telegram_id,
+            signals_unlocked=int(unlocked)
+        )
+
+    return unlocked
+
+
+def can_access_signals(
+    telegram_id
+):
+
+    return is_user_fully_verified(
+        telegram_id
     )
