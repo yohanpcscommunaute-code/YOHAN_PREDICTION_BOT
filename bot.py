@@ -628,17 +628,15 @@ def main():
     )
 
     # JEUX + SIGNAL
-    register_game_handlers(app)
+    # JEUX
+register_game_handlers(app)
 
-    print("✅ Bot connecté à Telegram.")
-    print("🎯 Système SIGNAL chargé.")
-    print("⏳ En attente des utilisateurs...")
+# PAIEMENTS
+register_payment_handlers(app)
 
-    # IMPORTANT :
-    # Garde le processus actif.
-    app.run_polling(
-        drop_pending_updates=True
-    )
+print("🤖 YOHAN PREDICTION BOT lancé.")
+
+app.run_polling()
 
 
 # ============================================================
