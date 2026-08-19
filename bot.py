@@ -1,6 +1,11 @@
 import os
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import (
+    Update,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+)
+
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -18,11 +23,18 @@ from database import (
 )
 
 from languages import TEXTS
-from megapari import megapari_message, megapari_keyboard
+from megapari import (
+    megapari_message,
+    megapari_keyboard,
+)
 
 from handlers.menu import main_menu_keyboard
 from handlers.games import register_game_handlers
 
+
+# ============================================================
+# CONFIGURATION
+# ============================================================
 
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 
@@ -72,7 +84,7 @@ async def clean_send(
 
 
 # ============================================================
-# MENU
+# MENU PRINCIPAL
 # ============================================================
 
 async def send_menu(
@@ -95,7 +107,12 @@ async def send_menu(
         except Exception:
             pass
 
-    caption = TEXTS.get(language, TEXTS["fr"]).get(
+    texts = TEXTS.get(
+        language,
+        TEXTS["fr"]
+    )
+
+    caption = texts.get(
         "main_menu",
         "🎯 <b>YOHAN PREDICTION BOT</b>"
     )
@@ -112,9 +129,11 @@ async def send_menu(
         "last_bot_message_id"
     ] = message.message_id
 
+    return message
+
 
 # ============================================================
-# VÉRIFICATION D'ACCÈS
+# CONTRÔLE D'ACCÈS
 # ============================================================
 
 async def require_access(
@@ -158,7 +177,18 @@ async def start(
 
     db_user = get_user(user.id)
 
-    if not db_user or not can_access_signals(user.id):
+    if not db_user:
+
+        await clean_send(
+            context,
+            update.effective_chat.id,
+            megapari_message("fr"),
+            megapari_keyboard("fr")
+        )
+
+        return
+
+    if not can_access_signals(user.id):
 
         await clean_send(
             context,
@@ -179,7 +209,7 @@ async def start(
 
 
 # ============================================================
-# RETOUR MENU
+# MENU
 # ============================================================
 
 async def menu_callback(
@@ -188,12 +218,17 @@ async def menu_callback(
 ):
 
     query = update.callback_query
+
     await query.answer()
 
-    if not await require_access(update, context):
+    if not await require_access(
+        update,
+        context
+    ):
         return
 
     user_id = query.from_user.id
+
     language = get_language(user_id)
 
     await send_menu(
@@ -271,12 +306,36 @@ def language_keyboard():
     ])
 
 
+async def language_menu_callback(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    query = update.callback_query
+
+    await query.answer()
+
+    if not await require_access(
+        update,
+        context
+    ):
+        return
+
+    await clean_send(
+        context,
+        query.message.chat_id,
+        "🌐 <b>CHOISIS TA LANGUE</b>",
+        language_keyboard()
+    )
+
+
 async def language_callback(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE
 ):
 
     query = update.callback_query
+
     await query.answer()
 
     user_id = query.from_user.id
@@ -291,32 +350,16 @@ async def language_callback(
         language
     )
 
-    if not await require_access(update, context):
+    if not await require_access(
+        update,
+        context
+    ):
         return
 
     await send_menu(
         context,
         query.message.chat_id,
         language
-    )
-
-
-async def language_menu_callback(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
-
-    query = update.callback_query
-    await query.answer()
-
-    if not await require_access(update, context):
-        return
-
-    await clean_send(
-        context,
-        query.message.chat_id,
-        "🌐 <b>CHOISIS TA LANGUE</b>",
-        language_keyboard()
     )
 
 
@@ -330,18 +373,24 @@ async def web_games_callback(
 ):
 
     query = update.callback_query
+
     await query.answer()
 
-    if not await require_access(update, context):
+    if not await require_access(
+        update,
+        context
+    ):
         return
 
     keyboard = InlineKeyboardMarkup([
+
         [
             InlineKeyboardButton(
                 "🌐 OUVRIR WEB GAMES V9",
                 url="https://example.com"
             )
         ],
+
         [
             InlineKeyboardButton(
                 "🏠 MENU",
@@ -369,18 +418,24 @@ async def support_callback(
 ):
 
     query = update.callback_query
+
     await query.answer()
 
-    if not await require_access(update, context):
+    if not await require_access(
+        update,
+        context
+    ):
         return
 
     keyboard = InlineKeyboardMarkup([
+
         [
             InlineKeyboardButton(
                 "🏠 MENU",
                 callback_data="menu"
             )
         ]
+
     ])
 
     await clean_send(
@@ -402,18 +457,24 @@ async def how_callback(
 ):
 
     query = update.callback_query
+
     await query.answer()
 
-    if not await require_access(update, context):
+    if not await require_access(
+        update,
+        context
+    ):
         return
 
     keyboard = InlineKeyboardMarkup([
+
         [
             InlineKeyboardButton(
                 "🏠 MENU",
                 callback_data="menu"
             )
         ]
+
     ])
 
     await clean_send(
@@ -429,7 +490,7 @@ async def how_callback(
 
 
 # ============================================================
-# VÉRIFICATION MEGAPARI
+# VÉRIFICATION INSCRIPTION
 # ============================================================
 
 async def verify_registration_callback(
@@ -444,6 +505,10 @@ async def verify_registration_callback(
         show_alert=True
     )
 
+
+# ============================================================
+# VÉRIFICATION DÉPÔT
+# ============================================================
 
 async def verify_deposit_callback(
     update: Update,
@@ -465,9 +530,15 @@ async def verify_deposit_callback(
 def main():
 
     if not TOKEN:
-        raise ValueError(
-            "TELEGRAM_TOKEN est introuvable."
+
+        raise RuntimeError(
+            "❌ TELEGRAM_TOKEN n'est pas configuré."
         )
+
+    print("================================")
+    print("🤖 YOHAN PREDICTION BOT")
+    print("📡 Initialisation...")
+    print("================================")
 
     init_db()
 
@@ -547,13 +618,23 @@ def main():
         )
     )
 
-    # JEUX
+    # JEUX + SIGNAL
     register_game_handlers(app)
 
-    print("🤖 YOHAN PREDICTION BOT lancé.")
+    print("✅ Bot connecté à Telegram.")
+    print("🎯 Système SIGNAL chargé.")
+    print("⏳ En attente des utilisateurs...")
 
-    app.run_polling()
+    # IMPORTANT :
+    # Garde le processus actif.
+    app.run_polling(
+        drop_pending_updates=True
+    )
 
+
+# ============================================================
+# LANCEMENT
+# ============================================================
 
 if __name__ == "__main__":
     main()
