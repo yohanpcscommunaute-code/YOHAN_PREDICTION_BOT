@@ -11,6 +11,10 @@ from config import (
 )
 
 
+# ============================================================
+# GÉNÉRATION
+# ============================================================
+
 def generate_prediction():
     """
     Génère une prédiction YOHAN PREDICTION.
@@ -28,7 +32,10 @@ def generate_prediction():
     )
 
     odds = round(
-        uniform(ODDS_MIN, ODDS_MAX),
+        uniform(
+            ODDS_MIN,
+            ODDS_MAX
+        ),
         2
     )
 
@@ -44,9 +51,38 @@ def generate_prediction():
     }
 
 
+# ============================================================
+# LUCKY JET
+# ============================================================
+
+def generate_lucky_jet_prediction():
+    result = generate_prediction()
+
+    result["game"] = "LUCKY JET"
+
+    return result
+
+
+# ============================================================
+# ROCKET QUEEN
+# ============================================================
+
+def generate_rocket_queen_prediction():
+    result = generate_prediction()
+
+    result["game"] = "ROCKET QUEEN"
+
+    return result
+
+
+# ============================================================
+# FORMATAGE
+# ============================================================
+
 def format_prediction(result):
     return (
-        "🎯 <b>YOHAN PREDICTION</b>\n\n"
+        f"🎯 <b>YOHAN PREDICTION</b>\n\n"
+        f"🎮 Jeu : <b>{result['game']}</b>\n\n"
         f"⏰ Heure : <b>{result['time']}</b>\n"
         f"📈 Cote : <b>{result['odds']}x</b>\n"
         f"🛡️ Sécurité : <b>{result['safe']}%</b>\n\n"
