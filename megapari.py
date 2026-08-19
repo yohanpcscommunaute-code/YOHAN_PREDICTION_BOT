@@ -10,123 +10,81 @@ from config import (
 )
 
 
-# ============================================================
-# MESSAGE INSCRIPTION + DÉPÔT
-# ============================================================
-
 def megapari_message(language="fr"):
 
-    texts = {
-
-        "fr": (
-            "🎯 <b>ACCÈS AU YOHAN PREDICTION BOT</b>\n\n"
-
-            "Pour accéder aux fonctions du bot, "
-            "tu dois effectuer les deux étapes suivantes :\n\n"
-
-            "1️⃣ <b>Créer ton compte Megapari</b>\n"
-            f"🎁 Code promo : <b>{MEGAPARI_PROMO_CODE}</b>\n\n"
-
-            "2️⃣ <b>Effectuer le dépôt minimum demandé</b>\n"
-            f"💰 Minimum : <b>{MEGAPARI_MIN_DEPOSIT} F</b>\n\n"
-
-            "Après ces étapes, utilise les boutons "
-            "de vérification ci-dessous.\n\n"
-
-            "🔐 L'accès sera accordé uniquement lorsque "
-            "les deux vérifications seront confirmées."
-        ),
-
-        "en": (
-            "🎯 <b>YOHAN PREDICTION BOT ACCESS</b>\n\n"
-
-            "To access the bot features, you must "
-            "complete both steps:\n\n"
-
+    if language == "en":
+        return (
+            "🎯 <b>YOHAN PREDICTION BOT</b>\n\n"
+            "To access the prediction signals, complete "
+            "the following steps:\n\n"
             "1️⃣ <b>Create your Megapari account</b>\n"
             f"🎁 Promo code: <b>{MEGAPARI_PROMO_CODE}</b>\n\n"
-
-            "2️⃣ <b>Make the required minimum deposit</b>\n"
+            "2️⃣ <b>Make the required deposit</b>\n"
             f"💰 Minimum: <b>{MEGAPARI_MIN_DEPOSIT} F</b>\n\n"
+            "After completing the steps, use the verification "
+            "buttons below.\n\n"
+            "🔐 Access is unlocked only after verification."
+        )
 
-            "After completing these steps, use the "
-            "verification buttons below.\n\n"
-
-            "🔐 Access will only be granted after "
-            "both verifications are confirmed."
-        ),
-    }
-
-    return texts.get(
-        language,
-        texts["fr"]
+    return (
+        "🎯 <b>ACCÈS AU YOHAN PREDICTION BOT</b>\n\n"
+        "Pour accéder aux signaux de prédiction, "
+        "tu dois effectuer les étapes suivantes :\n\n"
+        "1️⃣ <b>Créer ton compte Megapari</b>\n"
+        f"🎁 Code promo : <b>{MEGAPARI_PROMO_CODE}</b>\n\n"
+        "2️⃣ <b>Effectuer le dépôt demandé</b>\n"
+        f"💰 Minimum : <b>{MEGAPARI_MIN_DEPOSIT} F</b>\n\n"
+        "Après avoir terminé les étapes, utilise les "
+        "boutons de vérification ci-dessous.\n\n"
+        "🔐 L'accès sera débloqué uniquement après "
+        "confirmation des vérifications."
     )
 
-
-# ============================================================
-# CLAVIER
-# ============================================================
 
 def megapari_keyboard(language="fr"):
 
-    labels = {
-
-        "fr": {
-            "register": "📝 S'INSCRIRE SUR MEGAPARI",
-            "deposit": "💰 EFFECTUER LE DÉPÔT",
-            "verify_registration": "✅ VÉRIFIER L'INSCRIPTION",
-            "verify_deposit": "💳 VÉRIFIER LE DÉPÔT",
-            "back": "↩️ RETOUR",
-        },
-
-        "en": {
-            "register": "📝 REGISTER ON MEGAPARI",
-            "deposit": "💰 MAKE DEPOSIT",
-            "verify_registration": "✅ VERIFY REGISTRATION",
-            "verify_deposit": "💳 VERIFY DEPOSIT",
-            "back": "↩️ BACK",
-        },
-    }
-
-    lang = labels.get(
-        language,
-        labels["fr"]
-    )
+    if language == "en":
+        register_text = "📝 REGISTER ON MEGAPARI"
+        deposit_text = "💰 MAKE DEPOSIT"
+        verify_register_text = "✅ VERIFY REGISTRATION"
+        verify_deposit_text = "💳 VERIFY DEPOSIT"
+        back_text = "↩️ BACK"
+    else:
+        register_text = "📝 S'INSCRIRE SUR MEGAPARI"
+        deposit_text = "💰 EFFECTUER LE DÉPÔT"
+        verify_register_text = "✅ VÉRIFIER L'INSCRIPTION"
+        verify_deposit_text = "💳 VÉRIFIER LE DÉPÔT"
+        back_text = "↩️ RETOUR"
 
     return InlineKeyboardMarkup([
-
         [
             InlineKeyboardButton(
-                lang["register"],
-                url=MEGAPARI_REGISTER_URL
+                text=register_text,
+                url=MEGAPARI_REGISTER_URL,
             )
         ],
-
         [
             InlineKeyboardButton(
-                lang["deposit"],
-                url=MEGAPARI_REGISTER_URL
+                text=deposit_text,
+                url=MEGAPARI_REGISTER_URL,
             )
         ],
-
         [
             InlineKeyboardButton(
-                lang["verify_registration"],
-                callback_data="verify_megapari"
+                text=verify_register_text,
+                callback_data="verify_registration",
             )
         ],
-
         [
             InlineKeyboardButton(
-                lang["verify_deposit"],
-                callback_data="verify_deposit"
+                text=verify_deposit_text,
+                callback_data="verify_deposit",
             )
         ],
-
         [
             InlineKeyboardButton(
-                lang["back"],
-                callback_data="menu"
+                text=back_text,
+                callback_data="menu",
             )
         ],
     ])
